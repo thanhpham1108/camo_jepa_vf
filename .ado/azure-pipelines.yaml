@@ -1,0 +1,146 @@
+name: camo_jepa_$(Date:yyyyMMdd).$(Rev:r)
+
+trigger: none
+
+pool:
+  name: 'ADAS-L4-Linux-amd64'
+
+parameters:
+- name: pipelineRunId
+  displayName: 'Pipeline Run ID (Set "auto" for new build ID, or pass existing run ID)'
+  type: string
+  default: 'auto'
+- name: skipGitSync
+  displayName: 'Skip Git Sync (Set true to skip syncing source repository if already cloned on SLURM)'
+  type: boolean
+  default: false
+- name: entryCommand
+  displayName: 'Entry Command executed on Slurm container (e.g. direct python command or shell script)'
+  type: string
+  default: 'python3 -m src.camo_jepa.cli'
+- name: excludePatterns
+  displayName: 'S3 Upload Exclude Patterns (JSON array of file/folder patterns to exclude when packaging results for S3 upload)'
+  type: string
+  default: >-
+    []
+- name: extraEnv
+  displayName: 'Extra Environment Variable Overrides (KEY=VALUE multiline format)'
+  type: object
+  default:
+    envs: |
+      WORKSPACE_DIR=/workspaces/source
+      RUN_DIR=/workspaces/result/run_dir
+      DATASET_ROOT=/dataset/dataset_camo
+
+variables:
+  system.debug: 'false'
+  ${{ if or(eq(parameters.pipelineRunId, 'auto'), eq(parameters.pipelineRunId, '')) }}:
+    PIPELINE_RUN_ID: run_$(Build.BuildId)
+  ${{ if and(ne(parameters.pipelineRunId, 'auto'), ne(parameters.pipelineRunId, '')) }}:
+    PIPELINE_RUN_ID: ${{ parameters.pipelineRunId }}
+  REPO_NAME: "camo_jepa"
+  S3_BUCKET: "training-artifacts"
+
+stages:
+- stage: RunPipeline
+  displayName: 'Run Pipeline on Slurm (via Airflow)'
+  jobs:
+  - job: RunPipelineJob
+    displayName: 'Execute camo_jepa_pipeline_dag'
+    timeoutInMinutes: 0
+    cancelTimeoutInMinutes: 5
+    workspace:
+      clean: all
+    steps:
+    - checkout: none
+
+    - script: |
+        # Build the Airflow conf JSON safely with jq (supports both JSON object and KEY=VALUE multiline)
+        AIRFLOW_CONF_JSON=$(jq -cn \
+          --arg run_id           "$(PIPELINE_RUN_ID)" \
+          --arg skip_git_sync    "${{ parameters.skipGitSync }}" \
+          --arg entry_command    "${{ parameters.entryCommand }}" \
+          --arg exclude_patterns '${{ parameters.excludePatterns }}' \
+          --arg user_extra       '${{ parameters.extraEnv.envs }}' \
+          '{
+            pipeline_run_id: $run_id,
+            skip_git_sync: ($skip_git_sync | test("(?i)^true$|1|yes")),
+            entry_command: $entry_command,
+            exclude_patterns: (
+              $exclude_patterns
+              | if length > 0 and (startswith("[") or startswith("{")) then (try fromjson catch [])
+                else ["dataset_root", "run_logs", ".pth", ".pkl"] end
+            ),
+            extra_env: (
+              $user_extra
+              | if length > 0 and (startswith("{") or startswith("[")) then (try fromjson catch {})
+                else (split("\n") | map(select(contains("=") and (startswith("#") | not)))
+                      | map(split("=") | { (.[0]): (.[1:] | join("=")) }) | add // {}) end
+            )
+          }'
+        )
+        export AIRFLOW_CONF_JSON
+
+        python3 -u $(AIRFLOW_TRIGGER_SCRIPT)
+      displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow (camo_jepa_pipeline_dag)'
+      env:
+        AIRFLOW_DAG_ID: camo_jepa_pipeline_dag
+        AIRFLOW_TIMEOUT_MINUTES: '1440'
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+    - script: |
+        python3 -u $(AIRFLOW_TRIGGER_SCRIPT) --cancel \
+          --dag-id "camo_jepa_pipeline_dag" \
+          --run-id "$(AIRFLOW_RUN_ID)" \
+          --pipeline-run-id "$(PIPELINE_RUN_ID)"
+      displayName: 'Cancel Airflow DAG Run and SLURM Job on Pipeline Cancellation'
+      condition: and(canceled(), ne(variables['AIRFLOW_RUN_ID'], ''))
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- stage: PublishArtifacts
+  displayName: 'Download & Publish Artifacts'
+  dependsOn: RunPipeline
+  condition: succeeded()
+  jobs:
+  - job: PublishArtifactsJob
+    displayName: 'Download from S3 & Publish Artifact'
+    timeoutInMinutes: 60
+    workspace:
+      clean: all
+    steps:
+    - checkout: none
+
+    - script: |
+        set -e
+        bucket_name=$(S3_BUCKET)
+        s3_key="workspaces/$(REPO_NAME)/$(PIPELINE_RUN_ID)/results.tar.gz"
+        archive_path="$(Agent.TempDirectory)/results.tar.gz"
+        output_dir="$(Build.ArtifactStagingDirectory)/eval_results"
+
+        echo "Downloading results from s3://${bucket_name}/${s3_key}..."
+        aws s3 cp --endpoint-url $(S3_ENDPOINT) "s3://${bucket_name}/${s3_key}" "$archive_path"
+        
+        echo "Extracting results..."
+        mkdir -p "$output_dir"
+        tar -xzf "$archive_path" -C "$output_dir"
+        
+        echo "Cleaning up archive to free disk space..."
+        rm -f "$archive_path"
+        
+        echo "Extraction complete. Directory listing:"
+        find "$output_dir" -type f
+      displayName: 'Download and Extract Evaluation Results'
+      env:
+        AWS_ACCESS_KEY_ID: $(S3_ACCESS_KEY)
+        AWS_SECRET_ACCESS_KEY: $(S3_SECRET_KEY)
+        S3_BUCKET: "training-artifacts"
+        REPO_NAME: $(REPO_NAME)
+        PIPELINE_RUN_ID: $(PIPELINE_RUN_ID)
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Evaluation Results to Azure Artifacts'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/eval_results'
+        ArtifactName: 'EvaluationResults'
+        publishLocation: 'Container'
