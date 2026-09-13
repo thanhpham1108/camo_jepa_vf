@@ -30,7 +30,7 @@ parameters:
     envs: |
       WORKSPACE_DIR=/workspaces/source
       RUN_DIR=/workspaces/result/run_dir
-      DATASET_ROOT=/dataset/navsim
+      DATASET_ROOT=/dataset/camo_jepa
       EPOCHS=50
 
 variables:
