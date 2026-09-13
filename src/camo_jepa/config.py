@@ -33,7 +33,7 @@ class CaMoJEPAConfig:
     ablation_factorizer: bool = False # True: disable the factorizer branch
 
     # Drive-JEPA ViT-L checkpoint and V-JEPA2 root path for loading pretrained weights
-    vitl_checkpoint_path: str = ".cache/checkpoints/vjepa2/vitl_merge_3dataset_e50.pt"
+    vitl_checkpoint_path: str = "/dataset/camo_jepa/vitl_merge_3dataset_e50.pt"
     vjepa2_root: str = "src/vjepa2"
 
     # FlowFormer++ checkpoint and root path
