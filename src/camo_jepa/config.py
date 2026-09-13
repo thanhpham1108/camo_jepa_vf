@@ -11,7 +11,7 @@ _RUN_DIR = os.environ.get("RUN_DIR", "work_dirs")
 class CaMoJEPAConfig:
     # Dataset and dataloader parameters
     dataset_root: str = "/dataset/camo_jepa"  # SLURM container mount path
-    dataset_split: str = "trainval"
+    dataset_split: str = "train"
     history_length: int = 16
     stride: int = 1
     image_size: Tuple[int, int] = (512, 256)
