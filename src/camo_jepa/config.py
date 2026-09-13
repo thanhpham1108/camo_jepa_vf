@@ -16,7 +16,7 @@ class CaMoJEPAConfig:
     stride: int = 1
     image_size: Tuple[int, int] = (512, 256)
     max_cached_episodes: int = 16
-    batch_size: int = 8  # Giảm xuống 8 để vừa khít 40GB VRAM (A100)
+    batch_size: int = 4  # Giảm xuống 8 để vừa khít 40GB VRAM (A100)
     shuffle: bool = True
     num_workers: int = 4
 
