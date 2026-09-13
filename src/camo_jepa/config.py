@@ -1,19 +1,22 @@
 """Configuration objects for CaMo-JEPA training."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple
+import os
+
+_RUN_DIR = os.environ.get("RUN_DIR", "work_dirs")
 
 
 @dataclass(frozen=True)
 class CaMoJEPAConfig:
     # Dataset and dataloader parameters
-    dataset_root: str = "dataset_camo/navsim"
+    dataset_root: str = "/dataset/camo_jepa"  # SLURM container mount path
     dataset_split: str = "trainval"
     history_length: int = 16
     stride: int = 1
     image_size: Tuple[int, int] = (512, 256)
     max_cached_episodes: int = 16
-    batch_size: int = 4
+    batch_size: int = 16  # A100 40GB VRAM: tăng từ 4 lên 16
     shuffle: bool = True
     num_workers: int = 4
 
@@ -33,7 +36,7 @@ class CaMoJEPAConfig:
     ablation_factorizer: bool = False # True: disable the factorizer branch
 
     # Drive-JEPA ViT-L checkpoint and V-JEPA2 root path for loading pretrained weights
-    vitl_checkpoint_path: str = "/dataset/camo_jepa/vitl_merge_3dataset_e50.pt"
+    vitl_checkpoint_path: str = "/dataset/camo_jepa/vitl_merge_3dataset_e50.pt"  # 4.8GB confirmed on SLURM
     vjepa2_root: str = "src/vjepa2"
 
     # FlowFormer++ checkpoint and root path
@@ -65,8 +68,8 @@ class CaMoJEPAConfig:
     mask_ratio: float = 0.7
 
     # CaMo-JEPA training parameters
-    output_checkpoint_path: str = "outputs/camo-jepa/checkpoints/camo.pt"
-    output_log_dir: str = "outputs/camo-jepa/logs"
+    output_checkpoint_path: str = f"{_RUN_DIR}/camo-jepa/checkpoints/camo.pt"
+    output_log_dir: str = f"{_RUN_DIR}/camo-jepa/logs"
     pretrained: bool = True
     latent_dim: int = 1024
     num_epochs: int = 50
