@@ -74,7 +74,7 @@ class CaMoJEPAConfig:
     output_log_dir: str = f"{_RUN_DIR}/camo-jepa/logs"
     pretrained: bool = True
     latent_dim: int = 1024
-    num_epochs: int = 50
+    num_epochs: int = 2   # VALIDATION: Set to 2 to confirm pipeline runs end-to-end before full 50-epoch run
     n_steps_per_epoch: int = 2000  
     learning_rate: float = 0.000525
     target_ema_momentum: float = 0.99925

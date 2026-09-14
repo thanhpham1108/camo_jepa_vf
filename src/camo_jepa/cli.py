@@ -111,7 +111,7 @@ def main() -> None:
         model = torch.nn.DataParallel(model)
 
     # [OPT-1] Initialize GradScaler for AMP (works with bfloat16 autocast in engine.py)
-    scaler = torch.cuda.amp.GradScaler() if device.type == "cuda" else None
+    scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
 
     # Access the base model (unwrap DataParallel if needed) for param grouping
     base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
