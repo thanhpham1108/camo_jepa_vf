@@ -16,8 +16,8 @@ class CaMoJEPAConfig:
     stride: int = 1
     image_size: Tuple[int, int] = (512, 256)
     max_cached_episodes: int = 16
-    # [OPT-1] AMP (bfloat16) halves VRAM usage, allowing batch_size=16 safely on A100 40GB
-    batch_size: int = 16
+    # Set base batch_size to 8 (this is per-node/per-job total, but we will scale it dynamically in cli.py)
+    batch_size: int = 8
     shuffle: bool = True
     num_workers: int = 4
 
@@ -74,7 +74,7 @@ class CaMoJEPAConfig:
     pretrained: bool = True
     latent_dim: int = 1024
     num_epochs: int = 50
-    n_steps_per_epoch: int = 2000  # Tăng lên 2000 để tránh lưu quá nhiều file checkpoint
+    n_steps_per_epoch: int = 2000  
     learning_rate: float = 0.000525
     target_ema_momentum: float = 0.99925
     # Loss weights

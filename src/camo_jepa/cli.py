@@ -79,8 +79,7 @@ def main() -> None:
     print(f"[INFO] Best Checkpoint   : {best_ckpt_path}")
     print("=" * 70)
 
-    # Dataloader & Device Setup
-    dataloader = make_camo_dataloader(config)
+    # Device Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[INFO] Using device: {device}")
 
@@ -88,14 +87,23 @@ def main() -> None:
         n_gpus = torch.cuda.device_count()
         print(f"[INFO] GPU Device: {torch.cuda.get_device_name(0)}")
         print(f"[INFO] Number of GPUs available: {n_gpus}")
+        
+        # [OPT-5] Dynamically scale batch size based on available GPUs to prevent OOM
+        # config is a frozen dataclass, we must bypass frozen to update it
+        object.__setattr__(config, 'batch_size', config.batch_size * n_gpus)
+        print(f"[INFO] Dynamically scaled batch_size to {config.batch_size} for {n_gpus} GPUs")
+
+    # Dataloader & Device Setup
+    # We must create dataloader AFTER scaling batch size
+    dataloader = make_camo_dataloader(config)
 
     # Pipeline Model
     model = CaMoJEPAPipeline(config)
     model = model.to(device)
 
     # [OPT-3] Wrap with DataParallel if multiple GPUs are available
-    if device.type == "cuda" and torch.cuda.device_count() > 1:
-        print(f"[INFO] Enabling DataParallel across {torch.cuda.device_count()} GPUs.")
+    if device.type == "cuda" and n_gpus > 1:
+        print(f"[INFO] Enabling DataParallel across {n_gpus} GPUs.")
         model = torch.nn.DataParallel(model)
 
     # [OPT-1] Initialize GradScaler for AMP (works with bfloat16 autocast in engine.py)
