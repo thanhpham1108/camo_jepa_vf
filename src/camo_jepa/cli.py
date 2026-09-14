@@ -1,4 +1,16 @@
-"""Command-line runner for CaMo-JEPA training."""
+"""Command-line runner for CaMo-JEPA training.
+
+OPTIMIZATION NOTES (2026-09-14):
+- [OPT-3] Added torch.nn.DataParallel to automatically distribute the model
+  across ALL available GPUs on the SLURM node (SLURM requests 2x A100).
+  This alone can halve the per-step wall-clock time.
+- [OPT-1] Initialized torch.cuda.amp.GradScaler and passed it to train_step()
+  to work in conjunction with the bfloat16 autocast added in engine.py.
+- [OPT-4] Added torch.backends.cudnn.benchmark = True to let cuDNN auto-tune
+  kernel selection for fixed input sizes (free ~5-10% speedup).
+- [OPT-2] When saving checkpoints with DataParallel, save model.module.state_dict()
+  to ensure checkpoints are loadable without DataParallel in the future.
+"""
 
 from __future__ import annotations
 
@@ -44,6 +56,9 @@ def main() -> None:
     # Setup V-JEPA2 root path
     setup_vjepa2_path(config.vjepa2_root)
 
+    # [OPT-4] Enable cuDNN auto-tuner for fixed input sizes
+    torch.backends.cudnn.benchmark = True
+
     # Determine the active Ablation Study scenario
     scenario_name, ablation_flags = get_scenario_info(config)
     log_dir = Path(config.output_log_dir)
@@ -68,18 +83,32 @@ def main() -> None:
     dataloader = make_camo_dataloader(config)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[INFO] Using device: {device}")
+
     if device.type == "cuda":
+        n_gpus = torch.cuda.device_count()
         print(f"[INFO] GPU Device: {torch.cuda.get_device_name(0)}")
+        print(f"[INFO] Number of GPUs available: {n_gpus}")
 
     # Pipeline Model
     model = CaMoJEPAPipeline(config)
     model = model.to(device)
 
+    # [OPT-3] Wrap with DataParallel if multiple GPUs are available
+    if device.type == "cuda" and torch.cuda.device_count() > 1:
+        print(f"[INFO] Enabling DataParallel across {torch.cuda.device_count()} GPUs.")
+        model = torch.nn.DataParallel(model)
+
+    # [OPT-1] Initialize GradScaler for AMP (works with bfloat16 autocast in engine.py)
+    scaler = torch.cuda.amp.GradScaler() if device.type == "cuda" else None
+
+    # Access the base model (unwrap DataParallel if needed) for param grouping
+    base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
+
     # Optimizer Parameter Grouping
     decay_params = []
     no_decay_params = []
 
-    for name, p in model.named_parameters():
+    for name, p in base_model.named_parameters():
         if not p.requires_grad:
             continue
         # Apply no weight decay to bias and LayerNorm/BatchNorm
@@ -103,7 +132,7 @@ def main() -> None:
         print(f"[INFO] Found checkpoint at {latest_ckpt_path}. Loading weights...")
         ckpt_data, epoch, optimizer = load_checkpoint(
             checkpoint_path=latest_ckpt_path,
-            model=model,
+            model=base_model,  # [OPT-2] Always load into the base model
             optimizer=optimizer,
             strict=False,
         )
@@ -131,7 +160,7 @@ def main() -> None:
                 batch = batch.to(device)
             elif hasattr(batch, "images"):
                 batch.images = batch.images.to(device)
-            output = train_step(model, batch, optimizer, model.loss_fn)
+            output = train_step(model, batch, optimizer, base_model.loss_fn, scaler=scaler)
             step_time = time.time() - step_start_time
 
             current_losses = {
@@ -166,7 +195,7 @@ def main() -> None:
                 step_ckpt_path = checkpoint_dir / f"step_{batch_idx:06d}.pt"
                 saved_path = save_checkpoint(
                     checkpoint_path=step_ckpt_path,
-                    model=model,
+                    model=base_model,  # [OPT-2] Always save base model state_dict
                     epoch=epoch,
                     optimizer=optimizer,
                 )
@@ -178,7 +207,7 @@ def main() -> None:
         # Save checkpoint for the latest state of the model
         saved_path = save_checkpoint(
             checkpoint_path=latest_ckpt_path,
-            model=model,
+            model=base_model,  # [OPT-2] Always save base model state_dict
             epoch=epoch,
             optimizer=optimizer,
         )
@@ -188,7 +217,7 @@ def main() -> None:
             best_loss = epoch_avg_loss
             saved_path = save_checkpoint(
                 checkpoint_path=best_ckpt_path,
-                model=model,
+                model=base_model,  # [OPT-2] Always save base model state_dict
                 epoch=epoch,
                 optimizer=optimizer,
             )
