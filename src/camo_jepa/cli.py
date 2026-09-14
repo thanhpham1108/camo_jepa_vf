@@ -88,33 +88,21 @@ def main() -> None:
     print(f"[INFO] Using device: {device}")
 
     if device.type == "cuda":
-        n_gpus = torch.cuda.device_count()
         print(f"[INFO] GPU Device: {torch.cuda.get_device_name(0)}")
-        print(f"[INFO] Number of GPUs available: {n_gpus}")
-        
-        # [OPT-5] Dynamically scale batch size based on available GPUs to prevent OOM
-        # config is a frozen dataclass, we must bypass frozen to update it
-        object.__setattr__(config, 'batch_size', config.batch_size * n_gpus)
-        print(f"[INFO] Dynamically scaled batch_size to {config.batch_size} for {n_gpus} GPUs")
+        print(f"[INFO] Number of GPUs: {torch.cuda.device_count()} (using 1 — DataParallel disabled, incompatible with FlowFormer grid_sample)")
 
-    # Dataloader & Device Setup
-    # We must create dataloader AFTER scaling batch size
+    # Dataloader
     dataloader = make_camo_dataloader(config)
 
-    # Pipeline Model
+    # Pipeline Model (single GPU — AMP bfloat16 provides sufficient speedup)
     model = CaMoJEPAPipeline(config)
     model = model.to(device)
-
-    # [OPT-3] Wrap with DataParallel if multiple GPUs are available
-    if device.type == "cuda" and n_gpus > 1:
-        print(f"[INFO] Enabling DataParallel across {n_gpus} GPUs.")
-        model = torch.nn.DataParallel(model)
 
     # [OPT-1] Initialize GradScaler for AMP (works with bfloat16 autocast in engine.py)
     scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
 
-    # Access the base model (unwrap DataParallel if needed) for param grouping
-    base_model = model.module if isinstance(model, torch.nn.DataParallel) else model
+    # base_model alias (no DataParallel wrapper, so same as model)
+    base_model = model
 
     # Optimizer Parameter Grouping
     decay_params = []
