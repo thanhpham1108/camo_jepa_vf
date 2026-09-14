@@ -16,9 +16,13 @@ from __future__ import annotations
 
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 import sys
 import time
+
+# Set before importing torch: reduces GPU memory fragmentation (recommended by PyTorch OOM error messages)
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import torch
 

@@ -16,8 +16,9 @@ class CaMoJEPAConfig:
     stride: int = 1
     image_size: Tuple[int, int] = (512, 256)
     max_cached_episodes: int = 16
-    # Set base batch_size to 8 (this is per-node/per-job total, but we will scale it dynamically in cli.py)
-    batch_size: int = 8
+    # batch_size=4 is the confirmed safe value for 1x A100-40GB with FlowFormer+ViT-L
+    # cli.py will scale this automatically if 2 GPUs are available
+    batch_size: int = 4
     shuffle: bool = True
     num_workers: int = 4
 
