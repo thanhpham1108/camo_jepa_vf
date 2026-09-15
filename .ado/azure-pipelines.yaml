@@ -85,7 +85,7 @@ stages:
               $user_extra
               | if length > 0 and (startswith("{") or startswith("[")) then (try fromjson catch {})
                 else (split("\n") | map(select(contains("=") and (startswith("#") | not)))
-                      | map(split("=") | { (.[0]): (.[1:] | join("=")) }) | add // {}) end
+                      | map(split("=") | { (.[0] | sub("^\\s+"; "")): (.[1:] | join("=") | sub("^\\s+"; "")) }) | add // {}) end
             )
           }'
         )
