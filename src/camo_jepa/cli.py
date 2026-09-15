@@ -191,8 +191,8 @@ def main() -> None:
                 with open(log_file_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(step_log_record) + "\n")
 
-                # Save checkpoint for the current step
-                step_ckpt_path = checkpoint_dir / f"step_{batch_idx:06d}.pt"
+                # Save checkpoint for the current step (include epoch to prevent overwriting)
+                step_ckpt_path = checkpoint_dir / f"epoch_{epoch:03d}_step_{batch_idx:06d}.pt"
                 saved_path = save_checkpoint(
                     checkpoint_path=step_ckpt_path,
                     model=base_model,  # [OPT-2] Always save base model state_dict
