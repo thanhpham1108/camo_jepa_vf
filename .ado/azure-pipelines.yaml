@@ -14,6 +14,10 @@ parameters:
   displayName: 'Skip Git Sync (Set true to skip syncing source repository if already cloned on SLURM)'
   type: boolean
   default: false
+- name: cancelPreviousRun
+  displayName: 'Cancel Previous Active Run (Set true to cancel any currently running pipeline before starting)'
+  type: boolean
+  default: false
 - name: entryCommand
   displayName: 'Entry Command executed on Slurm container (e.g. direct python command or shell script)'
   type: string
@@ -92,6 +96,7 @@ stages:
       env:
         AIRFLOW_DAG_ID: camo_jepa_pipeline_dag
         AIRFLOW_TIMEOUT_MINUTES: '1440'
+        AIRFLOW_CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
     - script: |
