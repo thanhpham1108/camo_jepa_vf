@@ -32,10 +32,10 @@ class CaMoJEPAConfig:
     freeze_confounder: bool = False
     freeze_predictor: bool = False
 
-    # Ablation study flags
-    ablation_motion_branch: bool = False # True: disable the motion branch
-    ablation_confounder: bool = False # True: disable the confounder branch
-    ablation_factorizer: bool = False # True: disable the factorizer branch
+    # Ablation study flags (Read from ENV vars so we don't depend on ADO branch sync)
+    ablation_motion_branch: bool = os.environ.get("ABLATION_MOTION_BRANCH", "False").lower() in ("true", "1", "t")
+    ablation_confounder: bool = os.environ.get("ABLATION_CONFOUNDER", "False").lower() in ("true", "1", "t")
+    ablation_factorizer: bool = os.environ.get("ABLATION_FACTORIZER", "False").lower() in ("true", "1", "t")
 
     # Drive-JEPA ViT-L checkpoint and V-JEPA2 root path for loading pretrained weights
     vitl_checkpoint_path: str = "/dataset/camo_jepa/vitl_merge_3dataset_e50.pt"  # 4.8GB confirmed on SLURM
@@ -74,7 +74,7 @@ class CaMoJEPAConfig:
     output_log_dir: str = f"{_RUN_DIR}/camo-jepa/logs"
     pretrained: bool = True
     latent_dim: int = 1024
-    num_epochs: int = 5   # VALIDATION: Set to 2 to confirm pipeline runs end-to-end before full 50-epoch run
+    num_epochs: int = int(os.environ.get("EPOCHS", 50))
     n_steps_per_epoch: int = 2000  
     learning_rate: float = 0.000525
     target_ema_momentum: float = 0.99925
