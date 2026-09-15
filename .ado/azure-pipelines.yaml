@@ -56,15 +56,20 @@ stages:
     - checkout: none
 
     - script: |
+        # Extract clean branch name from refs/heads/...
+        BRANCH_NAME="${BUILD_SOURCEBRANCH#refs/heads/}"
+        
         # Build the Airflow conf JSON safely with jq (supports both JSON object and KEY=VALUE multiline)
         AIRFLOW_CONF_JSON=$(jq -cn \
           --arg run_id           "$(PIPELINE_RUN_ID)" \
+          --arg branch_name      "$BRANCH_NAME" \
           --arg skip_git_sync    "${{ parameters.skipGitSync }}" \
           --arg entry_command    "${{ parameters.entryCommand }}" \
           --arg exclude_patterns '${{ parameters.excludePatterns }}' \
           --arg user_extra       '${{ parameters.extraEnv.envs }}' \
           '{
             pipeline_run_id: $run_id,
+            repo_branch: $branch_name,
             skip_git_sync: ($skip_git_sync | test("(?i)^true$|1|yes")),
             entry_command: $entry_command,
             exclude_patterns: (
