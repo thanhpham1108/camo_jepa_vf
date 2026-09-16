@@ -35,7 +35,7 @@ parameters:
       WORKSPACE_DIR=/workspaces/source
       RUN_DIR=/workspaces/result/run_dir
       DATASET_ROOT=/dataset/camo_jepa
-      EPOCHS=50
+      EPOCHS=5
 
 variables:
   system.debug: 'false'
@@ -95,7 +95,7 @@ stages:
       displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow (camo_jepa_pipeline_dag)'
       env:
         AIRFLOW_DAG_ID: camo_jepa_pipeline_dag
-        AIRFLOW_TIMEOUT_MINUTES: '1440'
+        AIRFLOW_TIMEOUT_MINUTES: '4620'
         AIRFLOW_CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
