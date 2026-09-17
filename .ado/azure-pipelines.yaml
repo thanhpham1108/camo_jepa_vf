@@ -26,7 +26,9 @@ parameters:
   displayName: 'S3 Upload Exclude Patterns (JSON array of file/folder patterns to exclude when packaging results for S3 upload)'
   type: string
   default: >-
-    []
+    [
+      "step_*.pt"
+    ]
 - name: extraEnv
   displayName: 'Extra Environment Variable Overrides (KEY=VALUE multiline format)'
   type: object
@@ -60,20 +62,15 @@ stages:
     - checkout: none
 
     - script: |
-        # Extract clean branch name from refs/heads/...
-        BRANCH_NAME="${BUILD_SOURCEBRANCH#refs/heads/}"
-        
         # Build the Airflow conf JSON safely with jq (supports both JSON object and KEY=VALUE multiline)
         AIRFLOW_CONF_JSON=$(jq -cn \
-          --arg run_id           "$(PIPELINE_RUN_ID)" \
-          --arg branch_name      "$BRANCH_NAME" \
-          --arg skip_git_sync    "${{ parameters.skipGitSync }}" \
-          --arg entry_command    "${{ parameters.entryCommand }}" \
-          --arg exclude_patterns '${{ parameters.excludePatterns }}' \
-          --arg user_extra       '${{ parameters.extraEnv.envs }}' \
+          --arg run_id           "$PIPELINE_RUN_ID" \
+          --arg skip_git_sync    "$SKIP_GIT_SYNC" \
+          --arg entry_command    "$ENTRY_COMMAND" \
+          --arg exclude_patterns "$EXCLUDE_PATTERNS" \
+          --arg user_extra       "$USER_EXTRA_ENV" \
           '{
             pipeline_run_id: $run_id,
-            repo_branch: $branch_name,
             skip_git_sync: ($skip_git_sync | test("(?i)^true$|1|yes")),
             entry_command: $entry_command,
             exclude_patterns: (
@@ -83,9 +80,11 @@ stages:
             ),
             extra_env: (
               $user_extra
-              | if length > 0 and (startswith("{") or startswith("[")) then (try fromjson catch {})
-                else (split("\n") | map(select(contains("=") and (startswith("#") | not)))
-                      | map(split("=") | { (.[0] | sub("^\\s+"; "")): (.[1:] | join("=") | sub("^\\s+"; "")) }) | add // {}) end
+              | split("\n")
+              | map(gsub("^\\s+|\\s+$"; ""))
+              | map(select(contains("=") and (startswith("#") | not)))
+              | map(split("=") | { (.[0] | gsub("^\\s+|\\s+$"; "")): (.[1:] | join("=") | gsub("^\\s+|\\s+$"; "")) })
+              | add // {}
             )
           }'
         )
@@ -94,6 +93,10 @@ stages:
         python3 -u $(AIRFLOW_TRIGGER_SCRIPT)
       displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow (camo_jepa_pipeline_dag)'
       env:
+        SKIP_GIT_SYNC: '${{ parameters.skipGitSync }}'
+        ENTRY_COMMAND: '${{ parameters.entryCommand }}'
+        EXCLUDE_PATTERNS: '${{ parameters.excludePatterns }}'
+        USER_EXTRA_ENV: '${{ parameters.extraEnv.envs }}'
         AIRFLOW_DAG_ID: camo_jepa_pipeline_dag
         AIRFLOW_TIMEOUT_MINUTES: '4620'
         AIRFLOW_CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
