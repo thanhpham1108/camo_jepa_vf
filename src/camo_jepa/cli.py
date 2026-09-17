@@ -88,8 +88,12 @@ def main() -> None:
     print(f"[INFO] Using device: {device}")
 
     if device.type == "cuda":
-        print(f"[INFO] GPU Device: {torch.cuda.get_device_name(0)}")
-        print(f"[INFO] Number of GPUs: {torch.cuda.device_count()} (using 1 — DataParallel disabled, incompatible with FlowFormer grid_sample)")
+        props = torch.cuda.get_device_properties(0)
+        total_vram_gb = props.total_memory / (1024 ** 3)
+        print(f"[INFO] GPU Device       : {torch.cuda.get_device_name(0)}")
+        print(f"[INFO] Number of GPUs   : {torch.cuda.device_count()} (using 1 — DataParallel disabled, incompatible with FlowFormer grid_sample)")
+        print(f"[INFO] Total VRAM (HW)  : {total_vram_gb:.2f} GB (total physical VRAM allocated to this job by SLURM)")
+        print(f"[INFO] VRAM Free        : {torch.cuda.mem_get_info(0)[0] / (1024**3):.2f} GB (before model load)")
 
     # Dataloader
     dataloader = make_camo_dataloader(config)
@@ -97,6 +101,18 @@ def main() -> None:
     # Pipeline Model (single GPU — AMP bfloat16 provides sufficient speedup)
     model = CaMoJEPAPipeline(config)
     model = model.to(device)
+
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+        allocated_gb = torch.cuda.memory_allocated(0) / (1024 ** 3)
+        reserved_gb  = torch.cuda.memory_reserved(0) / (1024 ** 3)
+        free_gb      = torch.cuda.mem_get_info(0)[0] / (1024 ** 3)
+        total_vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        print(f"[INFO] VRAM after model load:")
+        print(f"  - Allocated (model weights) : {allocated_gb:.2f} GB")
+        print(f"  - Reserved (PyTorch cache)  : {reserved_gb:.2f} GB")
+        print(f"  - Free (still available)    : {free_gb:.2f} GB")
+        print(f"  - Total (HW)                : {total_vram_gb:.2f} GB")
 
     # [OPT-1] Initialize GradScaler for AMP (works with bfloat16 autocast in engine.py)
     scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
