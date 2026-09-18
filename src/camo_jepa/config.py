@@ -18,7 +18,7 @@ class CaMoJEPAConfig:
     max_cached_episodes: int = 16
     # batch_size=4 is the confirmed safe value for 1x A100-40GB with FlowFormer+ViT-L
     # cli.py will scale this automatically if 2 GPUs are available
-    batch_size: int = 8
+    batch_size: int = 4
     shuffle: bool = True
     num_workers: int = 4
 
