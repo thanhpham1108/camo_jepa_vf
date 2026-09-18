@@ -18,7 +18,7 @@ from .phase1 import CaMoJEPAPipeline
 
 
 def train_step(
-    model: CaMoJEPAPipeline | nn.DataParallel,
+    model: CaMoJEPAPipeline | nn.DataParallel | nn.parallel.DistributedDataParallel,
     batch: FrameBatch,
     optimizer: torch.optim.Optimizer,
     loss_fn: nn.Module | None = None,
@@ -27,14 +27,14 @@ def train_step(
     """Run forward pass, compute total loss, backpropagate, step optimizer, and update target encoder via EMA.
 
     Args:
-        model: The CaMoJEPAPipeline (or DataParallel-wrapped version).
+        model: The CaMoJEPAPipeline (or DataParallel/DistributedDataParallel-wrapped version).
         batch: A FrameBatch of images and metadata.
         optimizer: The AdamW optimizer.
         loss_fn: Optional loss function override. Defaults to model.loss_fn.
         scaler: Optional GradScaler for AMP mixed-precision training.
     """
-    # [OPT-2] Unwrap DataParallel to access the underlying model's methods
-    base_model = model.module if isinstance(model, nn.DataParallel) else model
+    # [OPT-2] Unwrap DataParallel / DistributedDataParallel to access the underlying model's methods
+    base_model = getattr(model, "module", model)
     base_model.train()
 
     active_loss_fn = loss_fn if loss_fn is not None else base_model.loss_fn
@@ -65,7 +65,7 @@ def train_step(
         total_loss.backward()
         optimizer.step()
 
-    # [OPT-2] EMA update must run on the base model, not the DataParallel wrapper
+    # [OPT-2] EMA update must run on the base model, not the DataParallel/DDP wrapper
     base_model.update_target_encoder()
 
     return output

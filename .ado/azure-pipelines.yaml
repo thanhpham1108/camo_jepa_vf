@@ -21,7 +21,7 @@ parameters:
 - name: entryCommand
   displayName: 'Entry Command executed on Slurm container (e.g. direct python command or shell script)'
   type: string
-  default: 'python3 -m src.camo_jepa.cli'
+  default: 'torchrun --standalone --nproc_per_node=gpu -m src.camo_jepa.cli'
 - name: excludePatterns
   displayName: 'S3 Upload Exclude Patterns (JSON array of file/folder patterns to exclude when packaging results for S3 upload)'
   type: string
