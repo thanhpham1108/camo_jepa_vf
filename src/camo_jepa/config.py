@@ -75,7 +75,7 @@ class CaMoJEPAConfig:
     pretrained: bool = True
     latent_dim: int = 1024
     num_epochs: int = int(os.environ.get("EPOCHS", 50))
-    n_steps_per_epoch: int = 2000  
+    n_steps_per_epoch: int = 3000  
     learning_rate: float = 0.000525
     target_ema_momentum: float = 0.99925
     # Loss weights
