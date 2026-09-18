@@ -158,7 +158,9 @@ def main() -> None:
 
     if is_ddp:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[local_rank], find_unused_parameters=False
+            model,
+            device_ids=[local_rank],
+            find_unused_parameters=True,  # Required for Ablation studies where some modules are bypassed in forward()
         )
 
     # [OPT-1] Initialize GradScaler for AMP (works with bfloat16 autocast in engine.py)
