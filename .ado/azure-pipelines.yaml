@@ -27,7 +27,7 @@ parameters:
   type: string
   default: >-
     [
-      "step_*.pt"
+      "epoch_*.pt"
     ]
 - name: extraEnv
   displayName: 'Extra Environment Variable Overrides (KEY=VALUE multiline format)'
