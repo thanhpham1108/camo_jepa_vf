@@ -273,6 +273,32 @@ def main() -> None:
         # Compute the average loss for the epoch
         epoch_avg_loss = running_epoch_loss / max(1, num_batches_in_epoch)
 
+        # ── Epoch-end parameter tracking (rank-0 only) ────────────────────────
+        if is_main:
+            # 1. Fusion gate: tanh(gate) controls how much motion info is blended in
+            if not config.ablation_motion_branch:
+                gate_val = torch.tanh(base_model.fusion.gate).item()
+            else:
+                gate_val = 0.0
+
+            # 2. LatentFactorizer: sanity-check the orthogonal projector P_task
+            if not config.ablation_factorizer:
+                with torch.no_grad():
+                    p_task_fp32 = base_model.factorizer._compute_p_task(dtype=torch.float32)
+                    trace_val       = torch.trace(p_task_fp32).item()
+                    rank_val        = torch.linalg.matrix_rank(p_task_fp32).item()
+                    idempotent_err  = torch.norm(p_task_fp32 @ p_task_fp32 - p_task_fp32).item()
+            else:
+                trace_val, rank_val, idempotent_err = 0.0, 0, 0.0
+
+            print(
+                f"[Epoch {epoch:03d} TRACKING] "
+                f"Fusion Gate (tanh): {gate_val:.4f} | "
+                f"P_task -> Trace: {trace_val:.4f}/{base_model.factorizer.task_dim if not config.ablation_factorizer else 'N/A'} | "
+                f"Rank: {rank_val} | "
+                f"P²-P Error: {idempotent_err:.2e}"
+            )
+
         # Only rank-0 saves checkpoints to avoid race conditions
         if is_main:
             saved_path = save_checkpoint(
