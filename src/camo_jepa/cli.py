@@ -243,10 +243,29 @@ def main() -> None:
                     loss_str = " | ".join(
                         [f"{k}: {v:.4f}" for k, v in current_losses.items()]
                     )
+                    
+                    # Gradient Diagnostics (Requires scaler.unscale_ to be called in engine.py first)
+                    gate_grad_norm = 0.0
+                    proj_grad_norm = 0.0
+                    predictor_grad_norm = 0.0
+
+                    if not config.ablation_motion_branch and base_model.fusion.gate.grad is not None:
+                        gate_grad_norm = base_model.fusion.gate.grad.norm().item()
+                    if not config.ablation_factorizer and hasattr(base_model.factorizer, 'raw_projection') and base_model.factorizer.raw_projection.grad is not None:
+                        proj_grad_norm = base_model.factorizer.raw_projection.grad.norm().item()
+                    if hasattr(base_model, 'predictor'):
+                        pred_grads = [p.grad for p in base_model.predictor.parameters() if p.grad is not None]
+                        if pred_grads:
+                            predictor_grad_norm = torch.linalg.norm(
+                                torch.stack([torch.linalg.norm(g.detach()) for g in pred_grads])
+                            ).item()
+                    
                     print(
                         f"[Epoch {epoch:03d}/{num_epochs:03d}][Step {batch_idx:04d}/{total_steps:04d}] "
                         f"Loss: {step_loss:.4f} ({loss_str}) | "
-                        f"Speed: {step_time:.2f}s/step"
+                        f"Speed: {step_time:.2f}s/step\n"
+                        f"      -> Grad Norms | Predictor: {predictor_grad_norm:.4e} | "
+                        f"Fusion Gate: {gate_grad_norm:.4e} | Factorizer Proj: {proj_grad_norm:.4e}"
                     )
                     step_log_record = {
                         "timestamp": datetime.now().isoformat(),
@@ -256,6 +275,11 @@ def main() -> None:
                         "scenario": scenario_name,
                         "losses": current_losses,
                         "step_time_sec": round(step_time, 3),
+                        "grad_norms": {
+                            "predictor": predictor_grad_norm,
+                            "fusion_gate": gate_grad_norm,
+                            "factorizer_proj": proj_grad_norm,
+                        }
                     }
                     with open(log_file_path, "a", encoding="utf-8") as f:
                         f.write(json.dumps(step_log_record) + "\n")

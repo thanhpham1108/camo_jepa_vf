@@ -59,6 +59,8 @@ def train_step(
     if scaler is not None:
         # [OPT-1] Scale gradients to prevent underflow in fp16/bf16
         scaler.scale(total_loss).backward()
+        # Unscale before checking gradients or stepping
+        scaler.unscale_(optimizer)
         scaler.step(optimizer)
         scaler.update()
     else:
