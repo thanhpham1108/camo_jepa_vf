@@ -22,8 +22,8 @@ except ImportError:
     HAS_FVCORE = False
     print("Warning: 'fvcore' module not found. FLOPs measurement will be skipped.")
 
-from camo_jepa.config import CaMoJEPAConfig
-from camo_jepa.pipeline import CaMoJEPAPipeline
+from .config import CaMoJEPAConfig
+from .pipeline import CaMoJEPAPipeline
 
 class DummyBatch:
     def __init__(self, images):
