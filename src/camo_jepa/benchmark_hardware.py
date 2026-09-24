@@ -223,6 +223,10 @@ def run_benchmark_scenario(config, is_frozen=True):
     
     # Overwrite config freezing rules safely since it's a frozen dataclass
     from dataclasses import replace
+    
+    # Giảm batch_size xuống 2 vì batch=4 đã vượt quá 40GB VRAM khi unfreeze FlowFormer++
+    config = replace(config, batch_size=2)
+    
     # To hit ~15-20% trainable params for "Frozen Backbone":
     # Freeze ViT (context & target encoders) but keep FlowFormer++ unfreezed
     freeze_flow = False
