@@ -80,8 +80,8 @@ class CaMoJEPAConfig:
     target_ema_momentum: float = 0.99925
     # Loss weights
     jepa_loss_weight: float = 1.0
-    orthogonality_loss_weight: float = 0.01
-    reconstruction_loss_weight: float = 0.01
+    orthogonality_loss_weight: float = 0.5
+    reconstruction_loss_weight: float = 0.1
 
     def __post_init__(self) -> None:
         if self.history_length < 2:
