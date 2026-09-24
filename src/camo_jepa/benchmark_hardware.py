@@ -24,14 +24,7 @@ except ImportError:
 
 from .config import CaMoJEPAConfig
 from .pipeline import CaMoJEPAPipeline
-
-class DummyBatch:
-    def __init__(self, images):
-        self.images = images
-    
-    def to(self, device):
-        self.images = self.images.to(device)
-        return self
+from .contracts import FrameBatch
 
 
 def measure_parameters(model):
@@ -239,7 +232,7 @@ def run_benchmark_scenario(config, is_frozen=True):
         config.image_size[1], 
         device=device
     )
-    dummy_batch = DummyBatch(dummy_images)
+    dummy_batch = FrameBatch(images=dummy_images)
     
     print("  [>] Measuring FLOPs (fvcore)...")
     flops_info = measure_flops(model, dummy_images)
