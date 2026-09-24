@@ -80,8 +80,8 @@ def profile_step(model, dummy_batch, optimizer, scaler, device):
     for _ in range(3):
         optimizer.zero_grad()
         with torch.amp.autocast('cuda', enabled=(scaler is not None)):
-            output = model(dummy_batch.images)
-            loss = output.losses['total'] if hasattr(output, 'losses') else output.sum()
+            output = model(dummy_batch)
+            loss = output.losses['total'] if isinstance(output.losses, dict) else output.z_pred.sum()
         if scaler:
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -104,8 +104,8 @@ def profile_step(model, dummy_batch, optimizer, scaler, device):
     
     # Forward
     with torch.amp.autocast('cuda', enabled=(scaler is not None)):
-        output = model(dummy_batch.images)
-        loss = output.losses['total'] if hasattr(output, 'losses') else output.sum()
+        output = model(dummy_batch)
+        loss = output.losses['total'] if isinstance(output.losses, dict) else output.z_pred.sum()
     fwd_end.record()
     
     # Backward
