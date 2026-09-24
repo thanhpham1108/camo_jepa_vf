@@ -214,10 +214,14 @@ def export_report(baseline_metrics, proposed_metrics, out_dir):
 def run_benchmark_scenario(config, is_frozen=True):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # Overwrite config freezing rules
-    config.freeze_context_encoder = is_frozen
-    config.freeze_target_encoder = is_frozen
-    config.freeze_flow_estimator = is_frozen
+    # Overwrite config freezing rules safely since it's a frozen dataclass
+    from dataclasses import replace
+    config = replace(
+        config,
+        freeze_context_encoder=is_frozen,
+        freeze_target_encoder=is_frozen,
+        freeze_flow_estimator=is_frozen
+    )
     
     print(f"  [>] Building model (frozen={is_frozen})...")
     model = CaMoJEPAPipeline(config).to(device)
