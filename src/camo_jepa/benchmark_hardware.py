@@ -14,13 +14,26 @@ os.environ.setdefault("TORCH_HOME", "/tmp/cache")
 os.environ.setdefault("XDG_CACHE_HOME", "/tmp/cache")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
-import torch
+import sys
+import subprocess
+
+# Auto-install fvcore if missing
 try:
     from fvcore.nn import FlopCountAnalysis
     HAS_FVCORE = True
 except ImportError:
-    HAS_FVCORE = False
-    print("Warning: 'fvcore' module not found. FLOPs measurement will be skipped.")
+    print("Warning: 'fvcore' module not found. Installing dynamically...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "fvcore"])
+        from fvcore.nn import FlopCountAnalysis
+        HAS_FVCORE = True
+        print("Successfully installed and imported fvcore.")
+    except Exception as e:
+        HAS_FVCORE = False
+        print(f"Failed to install fvcore: {e}")
+
+# Fix V-JEPA2 path issue for Baseline
+sys.path.append(os.path.join(os.getcwd(), 'src', 'vjepa2'))
 
 from .config import CaMoJEPAConfig
 from .pipeline import CaMoJEPAPipeline
@@ -209,11 +222,15 @@ def run_benchmark_scenario(config, is_frozen=True):
     
     # Overwrite config freezing rules safely since it's a frozen dataclass
     from dataclasses import replace
+    # To hit ~15-20% trainable params for "Frozen Backbone":
+    # Freeze ViT (context & target encoders) but keep FlowFormer++ unfreezed
+    freeze_flow = False
+    
     config = replace(
         config,
         freeze_context_encoder=is_frozen,
         freeze_target_encoder=is_frozen,
-        freeze_flow_estimator=is_frozen
+        freeze_flow_estimator=freeze_flow
     )
     
     print(f"  [>] Building model (frozen={is_frozen})...")
