@@ -14,6 +14,7 @@ os.environ.setdefault("TORCH_HOME", "/tmp/cache")
 os.environ.setdefault("XDG_CACHE_HOME", "/tmp/cache")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
+import torch
 import sys
 import subprocess
 
