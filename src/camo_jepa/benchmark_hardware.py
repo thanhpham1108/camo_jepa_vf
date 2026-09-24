@@ -15,7 +15,12 @@ os.environ.setdefault("XDG_CACHE_HOME", "/tmp/cache")
 os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 
 import torch
-from fvcore.nn import FlopCountAnalysis
+try:
+    from fvcore.nn import FlopCountAnalysis
+    HAS_FVCORE = True
+except ImportError:
+    HAS_FVCORE = False
+    print("Warning: 'fvcore' module not found. FLOPs measurement will be skipped.")
 
 from camo_jepa.config import CaMoJEPAConfig
 from camo_jepa.pipeline import CaMoJEPAPipeline
@@ -43,6 +48,13 @@ def measure_parameters(model):
     }
 
 def measure_flops(model, dummy_images):
+    if not HAS_FVCORE:
+        return {
+            "Forward_GFLOPs": 0,
+            "Backward_GFLOPs": 0,
+            "Total_GFLOPs": 0,
+        }
+        
     # fvcore expects a tuple of inputs
     flops = FlopCountAnalysis(model, dummy_images)
     flops.unsupported_ops_warnings(False)
