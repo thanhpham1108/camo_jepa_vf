@@ -20,7 +20,7 @@ class CaMoJEPAConfig:
     # cli.py will scale this automatically if 2 GPUs are available
     batch_size: int = 4
     shuffle: bool = True
-    num_workers: int = 4
+    num_workers: int = 8
 
     # Trainable model components
     freeze_context_encoder: bool = True
