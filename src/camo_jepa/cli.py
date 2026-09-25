@@ -260,12 +260,24 @@ def main() -> None:
                                 torch.stack([torch.linalg.norm(g.detach()) for g in pred_grads])
                             ).item()
                     
+                    peak_vram_gb = torch.cuda.max_memory_allocated() / (1024**3) if device.type == "cuda" else 0.0
+                    reserved_vram_gb = torch.cuda.max_memory_reserved() / (1024**3) if device.type == "cuda" else 0.0
+                    
+                    world_size = dist.get_world_size() if is_ddp else 1
+                    samples_per_sec = (config.batch_size * world_size) / step_time if step_time > 0 else 0.0
+                    try:
+                        import psutil
+                        cpu_ram_gb = psutil.virtual_memory().used / (1024**3)
+                    except ImportError:
+                        cpu_ram_gb = 0.0
+
                     print(
                         f"[Epoch {epoch:03d}/{num_epochs:03d}][Step {batch_idx:04d}/{total_steps:04d}] "
                         f"Loss: {step_loss:.4f} ({loss_str}) | "
                         f"Speed: {step_time:.2f}s/step\n"
                         f"      -> Grad Norms | Predictor: {predictor_grad_norm:.4e} | "
-                        f"Fusion Gate: {gate_grad_norm:.4e} | Factorizer Proj: {proj_grad_norm:.4e}"
+                        f"Fusion Gate: {gate_grad_norm:.4e} | Factorizer Proj: {proj_grad_norm:.4e}\n"
+                        f"      -> VRAM | Peak: {peak_vram_gb:.2f} GB | Reserved: {reserved_vram_gb:.2f} GB"
                     )
                     step_log_record = {
                         "timestamp": datetime.now().isoformat(),
@@ -279,6 +291,14 @@ def main() -> None:
                             "predictor": predictor_grad_norm,
                             "fusion_gate": gate_grad_norm,
                             "factorizer_proj": proj_grad_norm,
+                        },
+                        "vram": {
+                            "peak_allocated_GB": round(peak_vram_gb, 3),
+                            "reserved_GB": round(reserved_vram_gb, 3)
+                        },
+                        "hardware": {
+                            "samples_per_sec": round(samples_per_sec, 2),
+                            "cpu_ram_used_GB": round(cpu_ram_gb, 2)
                         }
                     }
                     with open(log_file_path, "a", encoding="utf-8") as f:
