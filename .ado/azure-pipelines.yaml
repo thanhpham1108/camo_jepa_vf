@@ -98,12 +98,16 @@ stages:
         if [ "$NO_GPU" = "True" ] || [ "$NO_GPU" = "true" ] || [ "$NO_GPU" = "1" ]; then
           TRIGGER_ARGS+=("--no-gpu")
         fi
+        if [ "$CANCEL_PREVIOUS" = "True" ] || [ "$CANCEL_PREVIOUS" = "true" ] || [ "$CANCEL_PREVIOUS" = "1" ]; then
+          TRIGGER_ARGS+=("--cancel-previous")
+        fi
 
         python3 -u $(AIRFLOW_TRIGGER_SCRIPT) "${TRIGGER_ARGS[@]}"
       displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow (camo_jepa_pipeline_dag)'
       env:
         SKIP_GIT_SYNC: '${{ parameters.skipGitSync }}'
         NO_GPU: '${{ parameters.noGpu }}'
+        CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
         ENTRY_COMMAND: '${{ parameters.entryCommand }}'
         EXCLUDE_PATTERNS: '${{ parameters.excludePatterns }}'
         USER_EXTRA_ENV: '${{ parameters.extraEnv.envs }}'
@@ -118,7 +122,7 @@ stages:
           --run-id "$(AIRFLOW_RUN_ID)" \
           --pipeline-run-id "$(PIPELINE_RUN_ID)"
       displayName: 'Cancel Airflow DAG Run and SLURM Job on Pipeline Cancellation'
-      condition: and(canceled(), ne(variables['AIRFLOW_RUN_ID'], ''))
+      condition: canceled()
       env:
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
