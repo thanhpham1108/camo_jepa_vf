@@ -18,6 +18,10 @@ parameters:
   displayName: 'Cancel Previous Active Run (Set true to cancel any currently running pipeline before starting)'
   type: boolean
   default: false
+- name: attachToCurrentRun
+  displayName: 'Attach to Current Active Run (Set true to reconnect/monitor an active Airflow DAG run for this run ID)'
+  type: boolean
+  default: false
 - name: noGpu
   displayName: 'Run without GPU (Set true to run slurm job without GPU resource for easier allocation)'
   type: boolean
@@ -101,6 +105,9 @@ stages:
         if [ "$CANCEL_PREVIOUS" = "True" ] || [ "$CANCEL_PREVIOUS" = "true" ] || [ "$CANCEL_PREVIOUS" = "1" ]; then
           TRIGGER_ARGS+=("--cancel-previous")
         fi
+        if [ "$ATTACH_TO_CURRENT_RUN" = "True" ] || [ "$ATTACH_TO_CURRENT_RUN" = "true" ] || [ "$ATTACH_TO_CURRENT_RUN" = "1" ]; then
+          TRIGGER_ARGS+=("--attach")
+        fi
 
         python3 -u $(AIRFLOW_TRIGGER_SCRIPT) "${TRIGGER_ARGS[@]}"
       displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow (camo_jepa_pipeline_dag)'
@@ -108,12 +115,14 @@ stages:
         SKIP_GIT_SYNC: '${{ parameters.skipGitSync }}'
         NO_GPU: '${{ parameters.noGpu }}'
         CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
+        ATTACH_TO_CURRENT_RUN: '${{ parameters.attachToCurrentRun }}'
         ENTRY_COMMAND: '${{ parameters.entryCommand }}'
         EXCLUDE_PATTERNS: '${{ parameters.excludePatterns }}'
         USER_EXTRA_ENV: '${{ parameters.extraEnv.envs }}'
         AIRFLOW_DAG_ID: camo_jepa_pipeline_dag
         AIRFLOW_TIMEOUT_MINUTES: '4620'
         AIRFLOW_CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
+        AIRFLOW_ATTACH: '${{ parameters.attachToCurrentRun }}'
         SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
     - script: |
