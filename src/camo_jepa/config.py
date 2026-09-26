@@ -14,7 +14,7 @@ class CaMoJEPAConfig:
     dataset_split: str = "train"
     history_length: int = 16
     stride: int = 1
-    image_size: Tuple[int, int] = (512, 256)
+    image_size: Tuple[int, int] = (256, 256)
     max_cached_episodes: int = 16
     # batch_size=4 is the confirmed safe value for 1x A100-40GB with FlowFormer+ViT-L
     # cli.py will scale this automatically if 2 GPUs are available
