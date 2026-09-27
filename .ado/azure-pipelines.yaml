@@ -156,7 +156,7 @@ stages:
         output_dir="$(Build.ArtifactStagingDirectory)/eval_results"
 
         echo "Downloading results from s3://${bucket_name}/${s3_key}..."
-        aws s3 cp --endpoint-url $(S3_ENDPOINT) "s3://${bucket_name}/${s3_key}" "$archive_path"
+        aws s3 cp --no-verify-ssl --endpoint-url $(S3_ENDPOINT) "s3://${bucket_name}/${s3_key}" "$archive_path"
         
         echo "Extracting results..."
         mkdir -p "$output_dir"
