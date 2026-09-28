@@ -18,7 +18,7 @@ class CaMoJEPAConfig:
     max_cached_episodes: int = 16
     # batch_size=4 is the confirmed safe value for 1x A100-40GB with FlowFormer+ViT-L
     # cli.py will scale this automatically if 2 GPUs are available
-    batch_size: int = 12
+    batch_size: int = 4
     shuffle: bool = True
     num_workers: int = 4
 
@@ -79,15 +79,15 @@ class CaMoJEPAConfig:
     latent_dim: int = 1024
     num_epochs: int = int(os.environ.get("EPOCHS", 50))
     n_steps_per_epoch: int = 120
-    learning_rate: float = 0.00045
+    learning_rate: float = 0.000525
     target_ema_momentum: float = 0.99925
     gate_learning_rate_multiplier: float = 1.0
     gate_weight_decay: float = 0.0
     gate_gradient_log_interval: int = 100
     # Loss weights
     jepa_loss_weight: float = 1.0
-    orthogonality_loss_weight: float = 0.5
-    reconstruction_loss_weight: float = 0.1
+    orthogonality_loss_weight: float = 0.01
+    reconstruction_loss_weight: float = 0.01
 
     def __post_init__(self) -> None:
         if self.history_length < 2:
