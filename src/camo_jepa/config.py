@@ -71,13 +71,13 @@ class CaMoJEPAConfig:
     mask_ratio: float = 0.7
 
     # CaMo-JEPA training parameters
-    output_checkpoint_path: str = f"{_RUN_DIR}/camo-jepa/checkpoints/camo.pt"
-    output_log_dir: str = f"{_RUN_DIR}/camo-jepa/logs"
-    resume_checkpoint_path: str | None = None
-    pretrained: bool = True
-    resume_optimizer_state: bool = True
+    output_checkpoint_path: str = f"{_RUN_DIR}/camo-jepa/ablations/no-recon/camo.pt"
+    output_log_dir: str = f"{_RUN_DIR}/camo-jepa/ablations/no-recon/logs"
+    resume_checkpoint_path: str | None = f"{_RUN_DIR}/camo-jepa/checkpoints/best_camo.pt"
+    pretrained: bool = False
+    resume_optimizer_state: bool = False
     latent_dim: int = 1024
-    num_epochs: int = int(os.environ.get("EPOCHS", 50))
+    num_epochs: int = 7
     n_steps_per_epoch: int = 120
     learning_rate: float = 0.000525
     target_ema_momentum: float = 0.99925
@@ -87,7 +87,7 @@ class CaMoJEPAConfig:
     # Loss weights
     jepa_loss_weight: float = 1.0
     orthogonality_loss_weight: float = 0.01
-    reconstruction_loss_weight: float = 0.01
+    reconstruction_loss_weight: float = 0.0
 
     def __post_init__(self) -> None:
         if self.history_length < 2:
