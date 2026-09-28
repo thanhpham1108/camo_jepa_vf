@@ -77,8 +77,8 @@ class CaMoJEPAConfig:
     pretrained: bool = False
     resume_optimizer_state: bool = False
     latent_dim: int = 1024
-    num_epochs: int = 7
-    n_steps_per_epoch: int = 120
+    num_epochs: int = 6
+    n_steps_per_epoch: int = 100
     learning_rate: float = 0.000525
     target_ema_momentum: float = 0.99925
     gate_learning_rate_multiplier: float = 1.0
