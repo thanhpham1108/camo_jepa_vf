@@ -73,12 +73,17 @@ class CaMoJEPAConfig:
     # CaMo-JEPA training parameters
     output_checkpoint_path: str = f"{_RUN_DIR}/camo-jepa/checkpoints/camo.pt"
     output_log_dir: str = f"{_RUN_DIR}/camo-jepa/logs"
+    resume_checkpoint_path: str | None = None
     pretrained: bool = True
+    resume_optimizer_state: bool = True
     latent_dim: int = 1024
     num_epochs: int = int(os.environ.get("EPOCHS", 50))
     n_steps_per_epoch: int = 120
     learning_rate: float = 0.00045
     target_ema_momentum: float = 0.99925
+    gate_learning_rate_multiplier: float = 1.0
+    gate_weight_decay: float = 0.0
+    gate_gradient_log_interval: int = 100
     # Loss weights
     jepa_loss_weight: float = 1.0
     orthogonality_loss_weight: float = 0.5
@@ -117,3 +122,9 @@ class CaMoJEPAConfig:
             raise ValueError("batch_size must be positive")
         if self.num_workers < 0:
             raise ValueError("num_workers must be non-negative")
+        if self.gate_learning_rate_multiplier <= 0:
+            raise ValueError("gate_learning_rate_multiplier must be positive")
+        if self.gate_weight_decay < 0:
+            raise ValueError("gate_weight_decay must be non-negative")
+        if self.gate_gradient_log_interval < 0:
+            raise ValueError("gate_gradient_log_interval must be non-negative")

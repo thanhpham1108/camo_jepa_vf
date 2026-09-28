@@ -93,6 +93,11 @@ def main() -> None:
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     latest_ckpt_path = Path(config.output_checkpoint_path).expanduser()
+    resume_ckpt_path = (
+        Path(config.resume_checkpoint_path).expanduser()
+        if config.resume_checkpoint_path
+        else latest_ckpt_path
+    )
     best_ckpt_path = checkpoint_dir / f"best_{latest_ckpt_path.name}"
 
     if is_main:
@@ -104,6 +109,7 @@ def main() -> None:
         print(f"[INFO] Training Mode    : {mode}")
         print(f"[INFO] Logging metrics to: {log_file_path}")
         print(f"[INFO] Latest Checkpoint : {latest_ckpt_path}")
+        print(f"[INFO] Resume Checkpoint : {resume_ckpt_path}")
         print(f"[INFO] Best Checkpoint   : {best_ckpt_path}")
         print("=" * 70)
 
@@ -172,9 +178,13 @@ def main() -> None:
     # Optimizer Parameter Grouping
     decay_params = []
     no_decay_params = []
+    gate_params = []
 
     for name, p in base_model.named_parameters():
         if not p.requires_grad:
+            continue
+        if name == "fusion.gate":
+            gate_params.append(p)
             continue
         # Apply no weight decay to bias and LayerNorm/BatchNorm
         if "bias" in name or "norm" in name:
@@ -186,28 +196,47 @@ def main() -> None:
         {"params": decay_params, "weight_decay": getattr(config, "weight_decay", 0.01)},
         {"params": no_decay_params, "weight_decay": 0.0},
     ]
+    if gate_params:
+        optimizer_grouped_parameters.append(
+            {
+                "params": gate_params,
+                "lr": config.learning_rate * config.gate_learning_rate_multiplier,
+                "weight_decay": config.gate_weight_decay,
+            }
+        )
 
     optimizer = torch.optim.AdamW(optimizer_grouped_parameters, lr=config.learning_rate)
+    
+    if is_main:
+        print(
+            "[INFO] Fusion gate optimizer: "
+            f"lr={config.learning_rate * config.gate_learning_rate_multiplier:g}, "
+            f"weight_decay={config.gate_weight_decay:g}"
+        )
 
     # Resume from Checkpoint
     start_epoch = 1
     best_loss = float("inf")
 
-    if latest_ckpt_path.exists() and not config.pretrained:
-        print(f"[INFO] Found checkpoint at {latest_ckpt_path}. Loading weights...")
-        ckpt_data, epoch, optimizer = load_checkpoint(
-            checkpoint_path=latest_ckpt_path,
+    if resume_ckpt_path.exists() and not config.pretrained:
+        print(f"[INFO] Found checkpoint at {resume_ckpt_path}. Loading weights...")
+        ckpt_data, epoch, restored_optimizer = load_checkpoint(
+            checkpoint_path=resume_ckpt_path,
             model=base_model,  # [OPT-2] Always load into the base model
-            optimizer=optimizer,
+            optimizer=optimizer if config.resume_optimizer_state else None,
             strict=False,
         )
+        if restored_optimizer is not None:
+            optimizer = restored_optimizer
         if epoch is not None:
             print(f"[INFO] Resuming training from epoch {epoch + 1}.")
+            if not config.resume_optimizer_state:
+                print("[INFO] Optimizer state reset; configured learning rates and weight decay are active.")
             start_epoch = epoch + 1
             if "best_loss" in ckpt_data:
                 best_loss = float(ckpt_data["best_loss"])
     else:
-        print(f"[INFO] No checkpoint found at {latest_ckpt_path} or pretrained mode enabled. Starting from scratch.")
+        print(f"[INFO] No resume checkpoint found at {resume_ckpt_path} or pretrained mode enabled. Starting from scratch.")
 
     num_epochs = config.num_epochs
     n_steps_per_epoch = config.n_steps_per_epoch
@@ -227,8 +256,31 @@ def main() -> None:
                 batch = batch.to(device)
             elif hasattr(batch, "images"):
                 batch.images = batch.images.to(device)
-            output = train_step(model, batch, optimizer, base_model.loss_fn, scaler=scaler)
+            log_gate_gradients = (
+                config.gate_gradient_log_interval > 0
+                and ((epoch - 1) * total_steps + batch_idx) % config.gate_gradient_log_interval == 0
+            )
+            output = train_step(
+                model, 
+                batch, 
+                optimizer, 
+                base_model.loss_fn, 
+                scaler=scaler, 
+                log_gate_gradients=log_gate_gradients
+            )
             step_time = time.time() - step_start_time
+            
+            if output.diagnostics is not None and is_main:
+                diagnostic_record = {
+                    "record_type": "gate_gradient",
+                    "timestamp": datetime.now().isoformat(),
+                    "epoch": epoch,
+                    "step": batch_idx,
+                    "diagnostics": output.diagnostics,
+                }
+                with open(log_file_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(diagnostic_record) + "\n")
+                print(f"[GATE GRAD][Epoch {epoch:03d}][Step {batch_idx:04d}] {output.diagnostics}")
 
             current_losses = {
                 k: float(v.detach().cpu()) for k, v in output.losses.items()
@@ -280,6 +332,7 @@ def main() -> None:
                         f"      -> VRAM | Peak: {peak_vram_gb:.2f} GB | Reserved: {reserved_vram_gb:.2f} GB"
                     )
                     step_log_record = {
+                        "record_type": "training_step",
                         "timestamp": datetime.now().isoformat(),
                         "epoch": epoch,
                         "step": batch_idx,
