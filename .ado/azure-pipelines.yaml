@@ -85,7 +85,7 @@ stages:
           '{
             pipeline_run_id: $run_id,
             repo_branch: $git_branch,
-            repo_name: "camo_jepa",
+            repo_name: ("camo_jepa@" + $git_branch),
             git_branch: $git_branch,
             branch: $git_branch,
             skip_git_sync: ($skip_git_sync | test("(?i)^true$|1|yes")),
