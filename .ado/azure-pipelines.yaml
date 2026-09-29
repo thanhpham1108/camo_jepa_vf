@@ -82,6 +82,7 @@ stages:
             pipeline_run_id: $run_id,
             git_branch: $git_branch,
             repo_branch: $git_branch,
+            repo_name: ("camo_jepa@" + $git_branch),
             skip_git_sync: ($skip_git_sync | test("(?i)^true$|1|yes")),
             entry_command: $entry_command,
             exclude_patterns: (
