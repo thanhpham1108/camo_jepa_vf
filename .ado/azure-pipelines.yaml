@@ -10,10 +10,6 @@ parameters:
   displayName: 'Pipeline Run ID (Set "auto" for new build ID, or pass existing run ID)'
   type: string
   default: 'auto'
-- name: gitBranch
-  displayName: 'Git Branch to checkout on Slurm'
-  type: string
-  default: 'main'
 - name: skipGitSync
   displayName: 'Skip Git Sync (Set true to skip syncing source repository if already cloned on SLURM)'
   type: boolean
@@ -77,17 +73,16 @@ stages:
         # Build the Airflow conf JSON safely with jq (supports both JSON object and KEY=VALUE multiline)
         AIRFLOW_CONF_JSON=$(jq -cn \
           --arg run_id           "$PIPELINE_RUN_ID" \
-          --arg git_branch       "$GIT_BRANCH" \
+          --arg git_branch       "$(Build.SourceBranchName)" \
           --arg skip_git_sync    "$SKIP_GIT_SYNC" \
           --arg entry_command    "$ENTRY_COMMAND" \
           --arg exclude_patterns "$EXCLUDE_PATTERNS" \
           --arg user_extra       "$USER_EXTRA_ENV" \
           '{
             pipeline_run_id: $run_id,
+            git_branch: $git_branch,
             repo_branch: $git_branch,
             repo_name: ("camo_jepa@" + $git_branch),
-            git_branch: $git_branch,
-            branch: $git_branch,
             skip_git_sync: ($skip_git_sync | test("(?i)^true$|1|yes")),
             entry_command: $entry_command,
             exclude_patterns: (
@@ -121,7 +116,6 @@ stages:
         python3 -u $(AIRFLOW_TRIGGER_SCRIPT) "${TRIGGER_ARGS[@]}"
       displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow (camo_jepa_pipeline_dag)'
       env:
-        GIT_BRANCH: '${{ parameters.gitBranch }}'
         SKIP_GIT_SYNC: '${{ parameters.skipGitSync }}'
         NO_GPU: '${{ parameters.noGpu }}'
         CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
