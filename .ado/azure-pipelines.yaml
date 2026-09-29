@@ -73,12 +73,15 @@ stages:
         # Build the Airflow conf JSON safely with jq (supports both JSON object and KEY=VALUE multiline)
         AIRFLOW_CONF_JSON=$(jq -cn \
           --arg run_id           "$PIPELINE_RUN_ID" \
+          --arg git_branch       "$(Build.SourceBranchName)" \
           --arg skip_git_sync    "$SKIP_GIT_SYNC" \
           --arg entry_command    "$ENTRY_COMMAND" \
           --arg exclude_patterns "$EXCLUDE_PATTERNS" \
           --arg user_extra       "$USER_EXTRA_ENV" \
           '{
             pipeline_run_id: $run_id,
+            git_branch: $git_branch,
+            repo_branch: $git_branch,
             skip_git_sync: ($skip_git_sync | test("(?i)^true$|1|yes")),
             entry_command: $entry_command,
             exclude_patterns: (
