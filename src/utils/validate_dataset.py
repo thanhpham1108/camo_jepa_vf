@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from torch.utils.data import DataLoader
 from src.camo_jepa.config import CaMoJEPAConfig
-from src.camo_jepa.dataset import CaMoJEPADataset
+from src.camo_jepa.data.camo import CaMoEpisodeDataset
 
 def main():
     print("="*60)
@@ -22,7 +22,7 @@ def main():
     
     print(f"📁 Đang load dataset từ: {config.dataset_root}")
     try:
-        dataset = CaMoJEPADataset(config, split="train")
+        dataset = CaMoEpisodeDataset(config, split="train")
         print(f"✅ Khởi tạo Dataset thành công!")
         print(f"📊 Tổng số clips có thể train: {len(dataset)}")
     except Exception as e:
