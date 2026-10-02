@@ -39,7 +39,7 @@ class CaMoJEPAConfig:
     ablation_factorizer: bool = os.environ.get("ABLATION_FACTORIZER", "False").lower() in ("true", "1", "t")
 
     # Drive-JEPA ViT-L checkpoint and V-JEPA2 root path for loading pretrained weights
-    vitl_checkpoint_path: str = "/dataset/camo_jepa/vitl_merge_3dataset_e50.pt"  # 4.8GB confirmed on SLURM
+    vitl_checkpoint_path: str = "/dataset/camo_jepa/models/vitl_merge_3dataset_e50.pt"  # Đã move vào thư mục models
     vjepa2_root: str = "src/vjepa2"
 
     # FlowFormer++ checkpoint and root path
