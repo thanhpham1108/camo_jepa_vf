@@ -2,7 +2,11 @@
 """Script validate dataset sau khi convert để đảm bảo DataLoader đọc được trơn tru."""
 
 import os
+import sys
 import time
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from torch.utils.data import DataLoader
 from src.camo_jepa.config import CaMoJEPAConfig
 from src.camo_jepa.dataset import CaMoJEPADataset
