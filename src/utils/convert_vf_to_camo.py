@@ -303,7 +303,7 @@ def write_output(args: argparse.Namespace, samples: list[FrameSample]) -> None:
         ego_motion=np.stack([sample.ego_motion for sample in samples]),
         ego_motion_names=np.asarray(EGO_MOTION_NAMES),
     )
-    with (output_root / "manifest.jsonl").open("w", encoding="utf-8") as manifest_file:
+    with (output_root / "manifest.jsonl").open("a", encoding="utf-8") as manifest_file:
         for index, sample in enumerate(samples):
             row = {
                 "episode": episode_path.relative_to(output_root).as_posix(),
