@@ -22,7 +22,13 @@ def main():
     
     print(f"📁 Đang load dataset từ: {config.dataset_root}")
     try:
-        dataset = CaMoEpisodeDataset(config, split="train")
+        dataset = CaMoEpisodeDataset(
+            dataset_root=config.dataset_root,
+            split="train",
+            history_length=config.history_length,
+            stride=config.stride,
+            image_size=config.image_size,
+        )
         print(f"✅ Khởi tạo Dataset thành công!")
         print(f"📊 Tổng số clips có thể train: {len(dataset)}")
     except Exception as e:
