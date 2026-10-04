@@ -46,6 +46,8 @@ parameters:
       RUN_DIR=/workspaces/result/run_dir
       DATASET_ROOT=/dataset/camo_jepa/datasets_converted
       EPOCHS=5
+      NCCL_DEBUG=INFO
+      NCCL_ASYNC_ERROR_HANDLING=1
 
 variables:
   system.debug: 'false'
