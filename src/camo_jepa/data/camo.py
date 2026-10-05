@@ -79,28 +79,33 @@ class CaMoEpisodeDataset(Dataset[dict[str, torch.Tensor]]):
         return len(self._windows)
 
     def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
-        window = self._windows[index]
-        episode = self._load_episode(window.episode_path)
-        stop_index = window.start_index + self.history_length
-        image_paths = episode["image_paths"][window.start_index:stop_index]
-        images = torch.stack(
-            [self._load_image(window.dataset_root / str(path)) for path in image_paths]
-        )
-        ego_motion = torch.from_numpy(
-            episode["ego_motion"][window.start_index:stop_index].astype(np.float32, copy=False)
-        )
-        can_bus = torch.from_numpy(
-            episode["can_bus"][window.start_index:stop_index].astype(np.float32, copy=False)
-        )
-        timestamps_us = torch.from_numpy(
-            episode["timestamps_us"][window.start_index:stop_index].astype(np.int64, copy=False)
-        )
-        return {
-            "images": images,
-            "ego_motion": ego_motion,
-            "can_bus": can_bus,
-            "timestamps_us": timestamps_us,
-        }
+        import random
+        try:
+            window = self._windows[index]
+            episode = self._load_episode(window.episode_path)
+            stop_index = window.start_index + self.history_length
+            image_paths = episode["image_paths"][window.start_index:stop_index]
+            images = torch.stack(
+                [self._load_image(window.dataset_root / str(path)) for path in image_paths]
+            )
+            ego_motion = torch.from_numpy(
+                episode["ego_motion"][window.start_index:stop_index].astype(np.float32, copy=False)
+            )
+            can_bus = torch.from_numpy(
+                episode["can_bus"][window.start_index:stop_index].astype(np.float32, copy=False)
+            )
+            timestamps_us = torch.from_numpy(
+                episode["timestamps_us"][window.start_index:stop_index].astype(np.int64, copy=False)
+            )
+            return {
+                "images": images,
+                "ego_motion": ego_motion,
+                "can_bus": can_bus,
+                "timestamps_us": timestamps_us,
+            }
+        except Exception as e:
+            print(f"Warning: Skipping corrupted window at index {index} due to error: {e}")
+            return self.__getitem__(random.randint(0, len(self._windows) - 1))
 
     def _discover_windows(self) -> list[EpisodeWindow]:
         windows: list[EpisodeWindow] = []
