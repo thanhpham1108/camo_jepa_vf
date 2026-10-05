@@ -36,5 +36,5 @@ def peek_directory(path_str, max_items=20):
     print("\n")
 
 if __name__ == "__main__":
-    peek_directory("/dataset/camo_jepa/data_260924")
-    peek_directory("/dataset/camo_jepa/rawdata_260924")
+    peek_directory("/dataset/data260926")
+    peek_directory("/dataset/camo_jepa/datasets_raw")
