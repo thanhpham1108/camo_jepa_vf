@@ -74,6 +74,9 @@ class CaMoJEPAConfig:
     output_checkpoint_path: str = f"{_RUN_DIR}/camo-jepa/checkpoints/camo.pt"
     output_log_dir: str = f"{_RUN_DIR}/camo-jepa/logs"
     pretrained: bool = True
+    # Path to a checkpoint to RESUME training from (optimizer state + epoch are restored).
+    # Set via env var RESUME_CHECKPOINT=<path_to_ckpt>. Leave empty to start fresh.
+    resume_checkpoint_path: str = os.environ.get("RESUME_CHECKPOINT", "")
     latent_dim: int = 1024
     num_epochs: int = int(os.environ.get("EPOCHS", 50))
     n_steps_per_epoch: int = 100

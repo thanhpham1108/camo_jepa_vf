@@ -193,21 +193,28 @@ def main() -> None:
     start_epoch = 1
     best_loss = float("inf")
 
-    if latest_ckpt_path.exists() and not config.pretrained:
-        print(f"[INFO] Found checkpoint at {latest_ckpt_path}. Loading weights...")
+    resume_path = Path(config.resume_checkpoint_path) if config.resume_checkpoint_path else None
+    if resume_path and resume_path.exists():
+        if is_main:
+            print(f"[INFO] Resuming from checkpoint: {resume_path}")
         ckpt_data, epoch, optimizer = load_checkpoint(
-            checkpoint_path=latest_ckpt_path,
-            model=base_model,  # [OPT-2] Always load into the base model
+            checkpoint_path=resume_path,
+            model=base_model,
             optimizer=optimizer,
             strict=False,
         )
         if epoch is not None:
-            print(f"[INFO] Resuming training from epoch {epoch + 1}.")
+            if is_main:
+                print(f"[INFO] Resuming training from epoch {epoch + 1}.")
             start_epoch = epoch + 1
             if "best_loss" in ckpt_data:
                 best_loss = float(ckpt_data["best_loss"])
+    elif resume_path:
+        if is_main:
+            print(f"[WARN] RESUME_CHECKPOINT is set but file not found: {resume_path}. Starting from scratch.")
     else:
-        print(f"[INFO] No checkpoint found at {latest_ckpt_path} or pretrained mode enabled. Starting from scratch.")
+        if is_main:
+            print(f"[INFO] No resume checkpoint set. Starting fresh training.")
 
     num_epochs = config.num_epochs
     n_steps_per_epoch = config.n_steps_per_epoch
