@@ -283,8 +283,7 @@ def main() -> None:
                         f"Loss: {step_loss:.4f} ({loss_str}) | "
                         f"Speed: {step_time:.2f}s/step\n"
                         f"      -> Grad Norms | Predictor: {predictor_grad_norm:.4e} | "
-                        f"Fusion Gate: {gate_grad_norm:.4e} | Factorizer Proj: {proj_grad_norm:.4e}\n"
-                        f"      -> VRAM | Peak: {peak_vram_gb:.2f} GB | Reserved: {reserved_vram_gb:.2f} GB"
+                        f"Fusion Gate: {gate_grad_norm:.4e} | Factorizer Proj: {proj_grad_norm:.4e}"
                     )
                     step_log_record = {
                         "timestamp": datetime.now().isoformat(),
