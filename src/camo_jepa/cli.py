@@ -16,7 +16,7 @@ OPTIMIZATION NOTES:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import os
 from pathlib import Path
@@ -67,8 +67,7 @@ def main() -> None:
     is_main = (not is_ddp) or (local_rank == 0)  # Only rank-0 writes files/logs
 
     if is_ddp:
-        import datetime
-        dist.init_process_group(backend="nccl", timeout=datetime.timedelta(minutes=30))
+        dist.init_process_group(backend="nccl", timeout=timedelta(minutes=30))
         torch.cuda.set_device(local_rank)
         device = torch.device("cuda", local_rank)
         print(f"[INFO] Rank {local_rank} initialized DDP successfully on GPU {torch.cuda.get_device_name(local_rank)}", flush=True)
