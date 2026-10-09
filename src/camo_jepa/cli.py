@@ -67,9 +67,11 @@ def main() -> None:
     is_main = (not is_ddp) or (local_rank == 0)  # Only rank-0 writes files/logs
 
     if is_ddp:
-        dist.init_process_group(backend="nccl")
+        import datetime
+        dist.init_process_group(backend="nccl", timeout=datetime.timedelta(minutes=30))
         torch.cuda.set_device(local_rank)
         device = torch.device("cuda", local_rank)
+        print(f"[INFO] Rank {local_rank} initialized DDP successfully on GPU {torch.cuda.get_device_name(local_rank)}", flush=True)
     else:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -157,11 +159,13 @@ def main() -> None:
             print(f"  - Total (HW)                : {total_vram_gb:.2f} GB")
 
     if is_ddp:
+        print(f"[INFO] Rank {local_rank} wrapping model with DistributedDataParallel...", flush=True)
         model = torch.nn.parallel.DistributedDataParallel(
             model,
             device_ids=[local_rank],
             find_unused_parameters=True,  # Required for Ablation studies where some modules are bypassed in forward()
         )
+        print(f"[INFO] Rank {local_rank} DDP wrapping completed.", flush=True)
 
     # [OPT-1] Initialize GradScaler for AMP (works with bfloat16 autocast in engine.py)
     scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None

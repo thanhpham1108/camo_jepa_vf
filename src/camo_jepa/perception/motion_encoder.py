@@ -45,6 +45,7 @@ class FlowFormerPlusPlusEstimator(nn.Module):
 
         # Fetch the configuration and build the FlowFormer++ backbone.
         cfg = get_cfg()
+        cfg.pretrain = False  # Tránh tải từ Hugging Face; toàn bộ weights đã được nạp từ local checkpoint kitti_finetune_vf.pth
         self.backbone = build_flowformer(cfg)
 
         # Load the checkpoint into the backbone.
