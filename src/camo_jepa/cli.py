@@ -212,6 +212,11 @@ def main() -> None:
             start_epoch = epoch + 1
             if "best_loss" in ckpt_data:
                 best_loss = float(ckpt_data["best_loss"])
+        # Override optimizer LR with configured learning rate for fine-tuning
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = config.learning_rate
+        if is_main:
+            print(f"[INFO] Optimizer learning rate set to: {config.learning_rate}")
     elif resume_path:
         if is_main:
             print(f"[WARN] RESUME_CHECKPOINT is set but file not found: {resume_path}. Starting from scratch.")
