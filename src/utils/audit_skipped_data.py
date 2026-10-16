@@ -198,12 +198,13 @@ def generate_markdown_report(
     if unconverted_scenes:
         md.append("| Tên Scene | Camera tìm thấy | Cảm biến thiếu | Lý do cụ thể |")
         md.append("| :--- | :---: | :---: | :--- |")
-        for s in unconverted_scenes[:30]:  # Top 30 scenes
+        limit = len(unconverted_scenes) if len(unconverted_scenes) <= 100 else 50
+        for s in unconverted_scenes[:limit]:
             cams = ", ".join(s["detected_cameras"]) if s["detected_cameras"] else "None"
             missing = ", ".join(s["missing_streams"]) if s["missing_streams"] else "None"
             md.append(f"| `{s['scene_name']}` | `{cams}` | `{missing}` | {s['reason']} |")
-        if len(unconverted_scenes) > 30:
-            md.append(f"\n*... và còn {len(unconverted_scenes) - 30} scenes khác được ghi đầy đủ trong file CSV kèm theo.*\n")
+        if len(unconverted_scenes) > limit:
+            md.append(f"\n*... và còn {len(unconverted_scenes) - limit} scenes khác được ghi đầy đủ 100% trong file CSV `skipped_scenes_detail.csv` kèm theo.*\n")
     else:
         md.append("✅ Không có scene nào bị bỏ qua toàn phần. 100% scenes đã được xử lý.\n")
 
@@ -239,15 +240,13 @@ def main() -> None:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    episodes_dir = converted_dir / "episodes" / "train"
-
     print("=" * 75)
     print("🔍 BẮT ĐẦU QUÉT KIỂM TOÁN DỮ LIỆU TOÀN DIỆN (RAW vs CONVERTED)")
     print(f"📁 Nguồn Raw      : {[str(d) for d in raw_dirs]}")
     print(f"📁 Nguồn Converted: {converted_dir}")
     print("=" * 75)
 
-    # 1. Tìm tất cả scene candidates
+    # 1. Tìm tất cả scene candidates trong các nguồn raw
     scenes: List[Path] = []
     for raw_root in raw_dirs:
         if not raw_root.exists():
@@ -255,6 +254,13 @@ def main() -> None:
         for root, dirs, _ in os.walk(raw_root):
             if "CAMERA" in dirs or "OTHERS" in dirs:
                 scenes.append(Path(root))
+
+    # Tìm tất cả file .npz đã convert (hỗ trợ cả train, val hoặc subfolder bất kỳ)
+    episodes_root = converted_dir / "episodes"
+    converted_npz_map: Dict[str, Path] = {}
+    if episodes_root.exists():
+        for p in episodes_root.rglob("*.npz"):
+            converted_npz_map[p.stem] = p
 
     total_raw_duration = 0.0
     total_conv_duration = 0.0
@@ -287,6 +293,8 @@ def main() -> None:
             "skipped_frames": raw_info["raw_frame_count"],
             "raw_duration_sec": round(raw_info["raw_duration_sec"], 2),
             "converted_duration_sec": 0.0,
+            "gap_sec": round(raw_info["raw_duration_sec"], 2),
+            "gap_percent": 100.0 if raw_info["raw_duration_sec"] > 0 else 0.0,
         }
 
         total_raw_duration += raw_info["raw_duration_sec"]
@@ -314,9 +322,9 @@ def main() -> None:
             all_records.append(record)
             continue
 
-        # Kiểm tra file .npz đã convert chưa
-        npz_path = episodes_dir / f"{scene_name}.npz"
-        if not npz_path.exists():
+        # Kiểm tra file .npz đã convert chưa (tìm trong toàn bộ splits)
+        npz_path = converted_npz_map.get(scene_name)
+        if npz_path is None or not npz_path.exists():
             count_missing_npz += 1
             record["status"] = "VALID_BUT_NOT_CONVERTED"
             record["reason"] = "Đủ cấu trúc nhưng chưa tạo file .npz"
@@ -331,10 +339,15 @@ def main() -> None:
                 conv_len = len(ts)
                 conv_dur = (ts[-1] - ts[0]) / 1e6 if conv_len > 1 else 0.0
 
+            gap_s = max(0.0, raw_info["raw_duration_sec"] - conv_dur)
+            gap_p = (gap_s / raw_info["raw_duration_sec"] * 100.0) if raw_info["raw_duration_sec"] > 0 else 0.0
+
             record["status"] = "CONVERTED"
             record["converted_frames"] = conv_len
             record["skipped_frames"] = max(0, raw_info["raw_frame_count"] - conv_len)
             record["converted_duration_sec"] = round(conv_dur, 2)
+            record["gap_sec"] = round(gap_s, 2)
+            record["gap_percent"] = round(gap_p, 1)
             record["reason"] = "OK"
 
             total_conv_duration += conv_dur
@@ -383,6 +396,7 @@ def main() -> None:
         writer = csv.DictWriter(f, fieldnames=[
             "scene_name", "status", "reason", "camera", "raw_frames",
             "converted_frames", "skipped_frames", "raw_duration_sec", "converted_duration_sec",
+            "gap_sec", "gap_percent",
             "detected_cameras", "missing_streams", "scene_path"
         ])
         writer.writeheader()
