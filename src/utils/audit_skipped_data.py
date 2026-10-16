@@ -39,7 +39,18 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("OUTPUT_DIR", "."),
         help="Directory where reports (md, csv, json) will be saved.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--output-csv",
+        default=None,
+        help="Optional explicit path for output CSV.",
+    )
+    parser.add_argument(
+        "--output-report",
+        default=None,
+        help="Optional explicit path for output report.",
+    )
+    args, _ = parser.parse_known_args()
+    return args
 
 
 def token_to_ns(token: str) -> Optional[int]:
@@ -366,7 +377,8 @@ def main() -> None:
     }
 
     # Xuất file CSV
-    csv_file = output_dir / "skipped_scenes_detail.csv"
+    csv_file = Path(args.output_csv) if args.output_csv else output_dir / "skipped_scenes_detail.csv"
+    csv_file.parent.mkdir(parents=True, exist_ok=True)
     with open(csv_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=[
             "scene_name", "status", "reason", "camera", "raw_frames",
@@ -377,7 +389,8 @@ def main() -> None:
         writer.writerows(all_records)
 
     # Xuất file JSON
-    json_file = output_dir / "skipped_audit_summary.json"
+    json_file = Path(args.output_report).with_suffix(".json") if args.output_report else output_dir / "skipped_audit_summary.json"
+    json_file.parent.mkdir(parents=True, exist_ok=True)
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
 
@@ -389,7 +402,8 @@ def main() -> None:
     )
 
     # Xuất file Markdown báo cáo đẹp
-    md_file = output_dir / "skipped_audit_report.md"
+    md_file = Path(args.output_report).with_suffix(".md") if args.output_report else output_dir / "skipped_audit_report.md"
+    md_file.parent.mkdir(parents=True, exist_ok=True)
     generate_markdown_report(summary, unconverted_scenes, converted_records, md_file)
 
     print("\n" + "=" * 75)
