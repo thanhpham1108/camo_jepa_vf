@@ -38,7 +38,6 @@ except ImportError:
 REQUIRED_STREAMS = ("NAV", "IMU", "VEHICLE_INFO", "VEHICLE_STEER")
 DEFAULT_SOURCE_DIRS = [
     "/dataset/camo_jepa/datasets_raw",
-    "/dataset/data260926",
 ]
 DEFAULT_CONVERTED_DIR = "/dataset/camo_jepa/datasets_converted"
 

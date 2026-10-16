@@ -32,7 +32,7 @@ def get_camera_name(scene_path):
     return None
 
 def main():
-    default_sources = ["/dataset/camo_jepa/datasets_raw", "/dataset/data260926"]
+    default_sources = ["/dataset/camo_jepa/datasets_raw"]
     env_sources = os.environ.get("DATASETS_RAW_DIRS") or os.environ.get("DATASETS_RAW_DIR")
     source_dirs = [s.strip() for s in env_sources.split(",")] if env_sources else default_sources
     

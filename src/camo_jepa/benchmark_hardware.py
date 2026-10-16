@@ -54,24 +54,55 @@ def measure_parameters(model):
         "Trainable_Count": trainable, # raw count
     }
 
+class _FvCoreTracableWrapper(torch.nn.Module):
+    """Thin wrapper so fvcore can trace CaMoJEPAPipeline.
+
+    fvcore's FlopCountAnalysis calls ``model(*inputs)`` where inputs are plain
+    tensors.  But ``CaMoJEPAPipeline.forward`` expects a ``FrameBatch`` dataclass,
+    which is not torch.jit.trace-able directly.  This wrapper accepts the raw
+    images tensor and constructs a FrameBatch internally before delegating.
+    """
+    def __init__(self, pipeline):
+        super().__init__()
+        self.pipeline = pipeline
+
+    def forward(self, images: torch.Tensor):
+        # images: [B, T, C, H, W]
+        batch = FrameBatch(images=images)
+        out = self.pipeline(batch)
+        # Return a single tensor so fvcore can finish tracing
+        return out.z_pred
+
+
 def measure_flops(model, dummy_images):
+    """Estimate FLOPs using fvcore.
+
+    Args:
+        model: CaMoJEPAPipeline instance
+        dummy_images: Tensor [B, T, C, H, W] — raw images (NOT FrameBatch)
+    """
     if not HAS_FVCORE:
         return {
             "Forward_GFLOPs": 0,
             "Backward_GFLOPs": 0,
             "Total_GFLOPs": 0,
         }
-        
-    # fvcore expects a tuple of inputs
-    flops = FlopCountAnalysis(model, dummy_images)
-    flops.unsupported_ops_warnings(False)
+
+    # Wrap model so fvcore receives plain tensors, not the FrameBatch dataclass.
+    # NOTE: fvcore uses torch.jit.trace which only captures the active control-flow
+    # branch, so FLOPs counts reflect the current ablation configuration.
+    wrapper = _FvCoreTracableWrapper(model)
+    wrapper.eval()
+
     try:
+        flops = FlopCountAnalysis(wrapper, dummy_images)
+        flops.unsupported_ops_warnings(False)
         forward_flops = flops.total()
     except Exception as e:
         print(f"fvcore FLOPs counting warning: {e}")
         forward_flops = 0
-    
-    # We estimate backward FLOPs as 2x Forward FLOPs for the trainable parts.
+
+    # Estimate backward FLOPs as 2x forward scaled by trainable-param ratio.
     param_info = measure_parameters(model)
     backward_flops = 2 * forward_flops * (param_info["Trainable_Ratio"] / 100.0)
     total_flops = forward_flops + backward_flops
