@@ -36,7 +36,10 @@ except ImportError:
     HAS_NUMPY = False
 
 REQUIRED_STREAMS = ("NAV", "IMU", "VEHICLE_INFO", "VEHICLE_STEER")
-DEFAULT_RAW_DIR = "/dataset/camo_jepa/datasets_raw"
+DEFAULT_SOURCE_DIRS = [
+    "/dataset/camo_jepa/datasets_raw",
+    "/dataset/data260926",
+]
 DEFAULT_CONVERTED_DIR = "/dataset/camo_jepa/datasets_converted"
 
 
@@ -422,11 +425,13 @@ def scan_source_directories(
             has_direct_streams = all(st in dirs for st in REQUIRED_STREAMS)
 
             if has_camera or has_others or has_direct_streams:
+                base_name = base_path.name
                 rel_parts = root_path.relative_to(base_path).parts
                 if len(rel_parts) > 1:
-                    group_name = "/".join(rel_parts[:-1])
+                    sub_grp = "/".join(rel_parts[:-1])
+                    group_name = f"{base_name}/{sub_grp}"
                 else:
-                    group_name = "Root"
+                    group_name = f"{base_name}/Root"
 
                 scene_name = root_path.name
                 scene_to_group[scene_name] = group_name
@@ -665,14 +670,15 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Thống kê dữ liệu đã convert và dữ liệu raw cho CaMo-JEPA."
     )
-    raw_env = os.environ.get("DATASETS_RAW_DIR", DEFAULT_RAW_DIR)
+    env_sources = os.environ.get("DATASETS_RAW_DIRS") or os.environ.get("DATASETS_RAW_DIR")
+    default_dirs = [s.strip() for s in env_sources.split(",")] if env_sources else DEFAULT_SOURCE_DIRS
     converted_env = os.environ.get("DATASETS_CONVERTED_DIR", DEFAULT_CONVERTED_DIR)
 
     parser.add_argument(
         "--source-dirs",
         nargs="+",
-        default=[raw_env],
-        help=f"Danh sách các thư mục chứa raw data (mặc định: {raw_env})",
+        default=default_dirs,
+        help=f"Danh sách các thư mục chứa raw data (mặc định: {default_dirs})",
     )
     parser.add_argument(
         "--converted-dir",
