@@ -9,6 +9,10 @@ def find_scenes(base_paths):
     scenes = []
     for base in base_paths:
         base = Path(base)
+        if not base.exists() and str(base).startswith("/"):
+            rel_base = Path(str(base).lstrip("/"))
+            if rel_base.exists():
+                base = rel_base
         if not base.exists():
             continue
         
@@ -29,11 +33,10 @@ def get_camera_name(scene_path):
 
 def main():
     source_dirs = [
-        "/dataset/data260926",
-        "/dataset/camo_jepa/datasets_raw"
+        os.environ.get("DATASETS_RAW_DIR", "/dataset/camo_jepa/datasets_raw")
     ]
     
-    output_root = Path("/dataset/camo_jepa/datasets_converted")
+    output_root = Path(os.environ.get("DATASETS_CONVERTED_DIR", "/dataset/camo_jepa/datasets_converted"))
     
     print("=" * 60)
     print("🚀 BẮT ĐẦU QUÁ TRÌNH BATCH CONVERSION DỮ LIỆU")
