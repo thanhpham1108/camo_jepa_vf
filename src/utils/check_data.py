@@ -332,7 +332,7 @@ def check_single_scene(
             reason=f"Lệch pha thời gian hoàn toàn giữa camera và telemetry",
         )
 
-    valid_frames_count = 0
+    valid_cam_timestamps: List[int] = []
     skipped_frames_count = 0
 
     if full_sync:
@@ -350,7 +350,7 @@ def check_single_scene(
                     is_synced = False
                     break
             if is_synced:
-                valid_frames_count += 1
+                valid_cam_timestamps.append(ts_cam)
             else:
                 skipped_frames_count += 1
     else:
@@ -358,12 +358,41 @@ def check_single_scene(
         overlap_end = telemetry_max + max_drift_ns
         for ts_cam in cam_timestamps:
             if overlap_start <= ts_cam <= overlap_end:
-                valid_frames_count += 1
+                valid_cam_timestamps.append(ts_cam)
             else:
                 skipped_frames_count += 1
 
-    duration_sec = valid_frames_count / target_hz
+    if not valid_cam_timestamps:
+        return SceneReport(
+            base_dir=base_dir,
+            group_name=group_name,
+            scene_name=scene_name,
+            camera_name=cam_name,
+            is_valid=False,
+            status="NO_VALID_FRAMES",
+            total_camera_frames=len(jpg_files),
+            valid_frames=0,
+            skipped_frames=len(jpg_files),
+            duration_seconds=0.0,
+            duration_hours=0.0,
+            reason="Không có frame camera nào khớp đồng bộ với telemetry",
+        )
+
+    # 1. Thời lượng thực tế (dựa trên khoảng thời gian thật giữa frame đầu và frame cuối)
+    duration_sec = (valid_cam_timestamps[-1] - valid_cam_timestamps[0]) / 1_000_000_000.0 if len(valid_cam_timestamps) > 1 else 0.0
     duration_hrs = duration_sec / 3600.0
+
+    # 2. Số lượng frame chuẩn khi resample về target_hz (10.0 Hz)
+    # Mô phỏng chính xác thuật toán resample_samples() của convert_vf_to_camo.py
+    interval_ns = int(1_000_000_000 / target_hz)
+    resampled_count = 1
+    next_ts = valid_cam_timestamps[0] + interval_ns
+    for ts in valid_cam_timestamps[1:]:
+        if ts >= next_ts:
+            resampled_count += 1
+            next_ts = ts + interval_ns
+
+    valid_frames_count = resampled_count
 
     if valid_frames_count < min_frames:
         return SceneReport(
@@ -378,7 +407,7 @@ def check_single_scene(
             skipped_frames=skipped_frames_count,
             duration_seconds=duration_sec,
             duration_hours=duration_hrs,
-            reason=f"Số frame hợp lệ ({valid_frames_count}) ít hơn ngưỡng tối thiểu ({min_frames})",
+            reason=f"Số frame 10Hz ({valid_frames_count}) ít hơn ngưỡng tối thiểu ({min_frames})",
         )
 
     return SceneReport(
@@ -603,13 +632,13 @@ def print_comprehensive_report(
         )
 
     # 2. BÁO CÁO TỔNG THỂ DỮ LIỆU THÔ (RAW DATA) VÀ ĐÓNG GÓP TIỀM NĂNG
-    print("\n" + "=" * 92)
-    print("📊 2. THỐNG KÊ TOÀN BỘ DATA THÔ (/dataset/camo_jepa/datasets_raw) & ĐÓNG GÓP TỪNG TẬP")
-    print("=" * 92)
+    print("\n" + "=" * 96)
+    print("📊 2. THỐNG KÊ TOÀN BỘ DATA THÔ (RAW DATA) & ĐÓNG GÓP TỪNG TẬP (QUY ĐỔI 10Hz)")
+    print("=" * 96)
 
-    header_r = f"{'Tập dữ liệu thô (Raw Group)':<38} | {'Scenes':<7} | {'Chuẩn':<6} | {'Frames Chuẩn':<13} | {'Giờ Tiềm Năng':<14} | {'Đã Convert'}"
+    header_r = f"{'Tập dữ liệu thô (Raw Group)':<44} | {'Scenes':<7} | {'Chuẩn':<6} | {'Frames (10Hz)':<14} | {'Thời lượng Raw':<15} | {'Đã Convert'}"
     print(header_r)
-    print("-" * 92)
+    print("-" * 96)
 
     tot_raw_scenes = len(raw_reports)
     tot_valid_scenes = sum(1 for r in raw_reports if r.is_valid)
@@ -626,7 +655,8 @@ def print_comprehensive_report(
         cnt_scenes = len(r_list)
         cnt_valid = sum(1 for r in r_list if r.is_valid)
         grp_valid_frames = sum(r.valid_frames for r in r_list if r.is_valid)
-        grp_hours = (grp_valid_frames / target_hz) / 3600.0
+        grp_seconds = sum(r.duration_seconds for r in r_list if r.is_valid)
+        grp_hours = grp_seconds / 3600.0
         dur_str = f"{grp_hours:.2f}h"
 
         conv_hours = converted_info.get("group_breakdown", {}).get(grp, {}).get("hours", 0.0)
@@ -634,18 +664,18 @@ def print_comprehensive_report(
         conv_str = f"{conv_hours:.2f}h ({pct_done})" if conv_hours > 0 else "Chưa convert"
 
         print(
-            f"{grp:<38} | {cnt_scenes:<7} | {cnt_valid:<6} | {grp_valid_frames:<13,d} | {dur_str:<14} | {conv_str}"
+            f"{grp:<44} | {cnt_scenes:<7} | {cnt_valid:<6} | {grp_valid_frames:<14,d} | {dur_str:<15} | {conv_str}"
         )
 
-    print("-" * 92)
+    print("-" * 96)
     grand_conv_hours = converted_info.get("total_hours", 0.0)
     grand_pct = f"{(grand_conv_hours / tot_raw_hours * 100):.1f}%" if tot_raw_hours > 0 else "0.0%"
     grand_conv_str = f"{grand_conv_hours:.2f}h ({grand_pct})" if grand_conv_hours > 0 else "Chưa convert"
     print(
-        f"{'TỔNG CỘNG TOÀN BỘ DATASET':<38} | {tot_raw_scenes:<7} | {tot_valid_scenes:<6} | "
-        f"{tot_raw_frames:<13,d} | {tot_raw_hours:<14.2f}h | {grand_conv_str}"
+        f"{'TỔNG CỘNG TOÀN BỘ DATASET':<44} | {tot_raw_scenes:<7} | {tot_valid_scenes:<6} | "
+        f"{tot_raw_frames:<14,d} | {tot_raw_hours:<15.2f}h | {grand_conv_str}"
     )
-    print("=" * 92)
+    print("=" * 96)
 
     # 3. PHÂN LOẠI CÁC SCENES LỖI THIẾU OTHERS HOẶC THIẾU DỮ LIỆU
     failed_reports = [r for r in raw_reports if not r.is_valid]
