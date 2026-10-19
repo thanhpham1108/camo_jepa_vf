@@ -25,8 +25,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path(os.environ.get("RESULT_DIR", "/workspaces/result")),
-        help="Destination directory (mounted to /workspaces/result for Azure upload).",
+        default=Path(os.environ.get("RUN_DIR", "/workspaces/result/run_dir")),
+        help="Destination directory (defaults to $RUN_DIR or /workspaces/result/run_dir).",
     )
     parser.add_argument(
         "--split",
@@ -139,13 +139,24 @@ def main() -> int:
     # Dọn dẹp staging folder sau khi nén
     shutil.rmtree(staging_dir, ignore_errors=True)
 
+    # Đảm bảo file có mặt ở cả RUN_DIR lẫn /workspaces/result để chắc chắn được tải lên Azure
+    result_parent = Path("/workspaces/result")
+    if result_parent.exists() and output_dir != result_parent:
+        alt_tar = result_parent / archive_tar_path.name
+        try:
+            if not alt_tar.exists():
+                shutil.copy2(archive_tar_path, alt_tar)
+                print(f"  🔗 Đã sao lưu bổ sung sang: {alt_tar}")
+        except Exception:
+            pass
+
     size_mb = archive_tar_path.stat().st_size / (1024 * 1024)
     print("\n" + "=" * 70)
     print(f"🎉 ĐÓNG GÓI THÀNH CÔNG GÓI DỮ LIỆU EVAL!")
-    print(f"📦 File nén   : {archive_tar_path}")
+    print(f"📦 Vị trí file: {archive_tar_path}")
     print(f"⚖️  Dung lượng : {size_mb:.1f} MB ({size_mb / 1024:.2f} GB)")
-    print(f"👉 File này nằm trong /workspaces/result nên sẽ tự động được tải lên")
-    print(f"   Azure DevOps Artifacts. Bạn có thể bấm nút 'Download' trên web về máy.")
+    print(f"👉 File đã nằm trong $RUN_DIR ({output_dir}).")
+    print(f"   Toàn bộ thư mục này sẽ được nén và đẩy lên Azure DevOps Artifacts.")
     print("=" * 70)
     return 0
 
