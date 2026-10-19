@@ -100,6 +100,18 @@ def get_episodes_by_group(
         if not src:
             src = read_episode_source(npz)
 
+        # Fallback 2: Kiểm tra symlink ảnh thực tế trỏ về folder raw nào
+        if not src:
+            ep_img_dir = converted_dir / "images" / "train" / ep_name
+            if ep_img_dir.exists():
+                try:
+                    for img in ep_img_dir.glob("*.jpg"):
+                        if img.is_symlink():
+                            src = str(img.resolve())
+                            break
+                except Exception:
+                    pass
+
         # Phân loại
         if "data260926" in src or "VF6_01_02" in src or "VF6_03" in src:
             if "VF6_03" in src:
@@ -107,7 +119,6 @@ def get_episodes_by_group(
             else:
                 groups["data260926/VF6_01_02"].append(npz)
         elif "VF6_01_02" in ep_name:
-            # Fallback: nhận diện qua tên scene (các scene data260926 thường có định dạng khác)
             groups["data260926/VF6_01_02"].append(npz)
         elif "VF6_03" in ep_name:
             groups["data260926/VF6_03"].append(npz)

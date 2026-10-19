@@ -159,42 +159,77 @@ def generate_markdown_report(
     unconverted_scenes: List[Dict[str, Any]],
     top_dropped_scenes: List[Dict[str, Any]],
     output_path: Path,
+    sync_metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Tạo báo cáo Markdown chuyên nghiệp, trực quan để gửi đối tác."""
     raw_h = summary["duration_hours"]["raw_hours"]
     conv_h = summary["duration_hours"]["converted_hours"]
     gap_h = summary["duration_hours"]["gap_hours"]
     gap_pct = summary["duration_hours"]["gap_percent"]
+    gap_breakdown = summary.get("gap_breakdown", {})
+    skipped_h = gap_breakdown.get("skipped_scenes_hours", 0.0)
+    skipped_min = gap_breakdown.get("skipped_scenes_minutes", 0.0)
+    skipped_pct = gap_breakdown.get("skipped_scenes_pct_of_gap", 0.0)
+    intra_h = gap_breakdown.get("intra_scene_sync_gap_hours", 0.0)
+    intra_min = gap_breakdown.get("intra_scene_sync_gap_minutes", 0.0)
+    intra_pct = gap_breakdown.get("intra_scene_pct_of_gap", 0.0)
+    n_converted = summary["converted_scenes"]
+
+    sync_info = sync_metadata or {}
+    sync_mode = sync_info.get("sync_mode", "unknown")
+    max_gap_ms = sync_info.get("max_interp_gap_ms", 300.0)
+    max_drift_ms = sync_info.get("max_drift_ms", 80.0)
+
+    if sync_mode == "interpolation":
+        sync_desc = f"Nội suy tuyến tính LERP & SLERP (ngưỡng mất tín hiệu tối đa: {max_gap_ms:.0f} ms)"
+        intra_reason = f"Cắt mép đầu/cuối clip (chờ GPS fix) + ngắt sóng cảm biến > {max_gap_ms:.0f} ms"
+        filter_detail = f"Khoảng cách 2 gói tin liên tiếp > {max_gap_ms:.0f} ms (mất sóng CAN/GPS)"
+    else:
+        sync_desc = f"Khớp hàng gần nhất - Nearest Row (ngưỡng sai số tối đa: {max_drift_ms:.0f} ms)"
+        intra_reason = f"Cắt mép đầu/cuối clip + lọc frame lệch timestamp > {max_drift_ms:.0f} ms"
+        filter_detail = f"Timestamp giữa Camera và CAN-bus lệch > {max_drift_ms:.0f} ms"
 
     md = []
     md.append("# 📊 BÁO CÁO KIỂM TOÁN DỮ LIỆU HUẤN LUYỆN CA-MO JEPA")
-    md.append("## Phân Tích & Giải Trình Độ Hụt Thời Lượng (10.6 Giờ Raw → 7.7 Giờ Converted)\n")
+    md.append(f"## Phân Tích & Giải Trình Độ Hụt Thời Lượng ({raw_h:.2f} Giờ Raw → {conv_h:.2f} Giờ Converted)\n")
     md.append("> **Dự án:** CaMo-JEPA | **Nguồn dữ liệu:** `datasets_raw` & `data260926`\n")
+    md.append(f"> **Phương pháp đồng bộ:** `{sync_desc}`\n")
     md.append("---\n")
 
     md.append("### 1. Tổng Kết Điều Hành (Executive Summary)\n")
     md.append("| Chỉ số | Giá trị | Ý nghĩa kỹ thuật |")
     md.append("| :--- | :---: | :--- |")
-    md.append(f"| **Tổng thời lượng thu thập (Raw Data)** | **{raw_h:.2f} giờ** | Tổng thời gian xe chạy ghi nhận từ các camera |")
-    md.append(f"| **Thời lượng đạt chuẩn nạp vào Model** | **{conv_h:.2f} giờ** | Thời lượng có đủ ảnh + cảm biến đồng bộ chính xác |")
+    md.append(f"| **Tổng thời lượng thu thập (Raw Data)** | **{raw_h:.2f} giờ** | Tổng thời gian xe chạy ghi nhận từ các camera (@ 30 FPS) |")
+    md.append(f"| **Thời lượng đạt chuẩn nạp vào Model** | **{conv_h:.2f} giờ** | Thời lượng có đủ ảnh + cảm biến đồng bộ chính xác (@ 10 Hz) |")
     md.append(f"| **Tổng thời lượng bị loại bỏ (Gap)** | **{gap_h:.2f} giờ** ({gap_pct:.1f}%) | Phần dữ liệu không đủ điều kiện kỹ thuật để huấn luyện |")
     md.append(f"| **Tổng số Scenes quét trong Raw** | **{summary['total_candidate_scenes']} scenes** | Toàn bộ thư mục ghi nhận trên hệ thống |")
-    md.append(f"| **Số Scenes Chuyển Đổi Thành Công** | **{summary['converted_scenes']} scenes** | Đã tạo thành công các file episode `.npz` |")
-    md.append(f"| **Số Scenes Bị Bỏ Qua Toàn Phần (0%)** | **{summary['skipped_scenes_total']} scenes** | Không tạo được episode do thiếu điều kiện bắt buộc |")
+    md.append(f"| **Số Scenes Chuyển Đổi Thành Công** | **{n_converted} scenes** | Đã tạo thành công các file episode `.npz` |")
+    md.append(f"| **Số Scenes Bị Bỏ Qua Toàn Phần (0%)** | **{summary['skipped_scenes_total']} scenes** | Không tạo được episode do thiếu điều kiện bắt buộc (`OTHERS/`) |")
+    md.append(f"| **Tổng số ảnh quét trong Raw (30 FPS)** | **{summary['frame_metrics']['total_raw_frames']:,} frames** | Trung bình 30 ảnh/giây |")
+    md.append(f"| **Tổng số frame nạp vào Model (10 Hz)** | **{summary['frame_metrics']['total_converted_frames']:,} frames** | Đã hạ mẫu (downsample) về 10 Hz theo chuẩn mô hình |")
     md.append("\n---\n")
 
-    md.append("### 2. Phân Bổ Nguyên Nhân Thất Thoát Dữ Liệu (Root Cause Breakdown)\n")
-    md.append("Hao hụt **2.9 giờ (~27.4%)** tập trung vào các nhóm nguyên nhân kỹ thuật cụ thể sau:\n")
+    md.append("### 2. Phân Bổ Bản Chất Độ Hụt Thời Lượng (Gap Breakdown)\n")
+    md.append(f"Hao hụt **{gap_h:.2f} giờ (~{gap_pct:.1f}%)** được phân tách thành hai tầng nguyên nhân cụ thể:\n")
+    md.append("| Tầng hao hụt | Thời lượng hụt | Tỷ trọng trên tổng Gap | Cơ chế kỹ thuật |")
+    md.append("| :--- | :---: | :---: | :--- |")
+    md.append(f"| **1. Bỏ qua toàn phần ({summary['skipped_scenes_total']} scenes)** | **{skipped_h:.2f} giờ** ({skipped_min:.1f} phút) | **{skipped_pct:.1f}%** | Thiếu hẳn thư mục `OTHERS/` (không có CAN/IMU) |")
+    md.append(f"| **2. Co ngắn trong {n_converted} scenes thành công** | **{intra_h:.2f} giờ** ({intra_min:.1f} phút) | **{intra_pct:.1f}%** | {intra_reason} |")
+    md.append("\n> [!NOTE]")
+    md.append("> **Về số lượng frame:** Khoảng ~66.7% số ảnh raw bị lược bỏ **theo thiết kế chuẩn** do converter hạ tần số lấy mẫu từ **30 FPS xuống 10 Hz** (`--target-hz 10`), phần còn lại do cắt mép đồng bộ cảm biến và các scenes bị bỏ qua.\n")
+    md.append("---\n")
+
+    md.append("### 3. Phân Loại Chi Tiết Các Nguyên Nhân Bỏ Qua / Rớt Frame\n")
     md.append("| Nhóm nguyên nhân | Chi tiết kỹ thuật | Ảnh hưởng |")
     md.append("| :--- | :--- | :---: |")
     md.append(f"| **1. Cấu trúc thư mục không hợp lệ** | Thiếu thư mục `CAMERA/` hoặc `OTHERS/` do quá trình chép file dở dang | **{summary['breakdown']['invalid_structure']} scenes** |")
     md.append(f"| **2. Thiếu Camera góc trước** | Không tìm thấy `CAM_P_F` hoặc `CAM_F` (chỉ có camera bên sườn/đuôi) | **{summary['breakdown']['no_front_camera']} scenes** |")
     md.append(f"| **3. Thiếu luồng cảm biến bắt buộc** | Thiếu một trong 4 luồng telemetry (`NAV`, `IMU`, `VEHICLE_INFO`, `STEER`) | **{summary['breakdown']['missing_telemetry']} scenes** |")
-    md.append(f"| **4. Lệch đồng bộ cảm biến (> 80ms)** | Timestamp giữa Camera và CAN-bus lệch quá xa (vượt ngưỡng an toàn) | **Frame-level drops** |")
+    md.append(f"| **4. Lọc frame không đồng bộ** | {filter_detail} | **Frame-level drops** |")
     md.append(f"| **5. Cắt bỏ đoạn đầu/cuối (Truncation)** | Cảm biến CAN-bus bắt đầu ghi sau Camera hoặc tắt trước Camera | **Trôi mép clip** |")
     md.append("\n---\n")
 
-    md.append("### 3. Danh Sách Các Scenes Bị Bỏ Qua Toàn Phần (Chưa Được Convert)\n")
+    md.append("### 4. Danh Sách Các Scenes Bị Bỏ Qua Toàn Phần (Chưa Được Convert)\n")
     if unconverted_scenes:
         md.append("| Tên Scene | Camera tìm thấy | Cảm biến thiếu | Lý do cụ thể |")
         md.append("| :--- | :---: | :---: | :--- |")
@@ -210,10 +245,11 @@ def generate_markdown_report(
 
     md.append("\n---\n")
 
-    md.append("### 4. Top Scenes Có Tỷ Lệ Rớt Frame / Hụt Thời Lượng Lớn Nhất\n")
+    md.append("### 5. Top Scenes Có Tỷ Lệ Rớt Frame / Hụt Thời Lượng Lớn Nhất\n")
     md.append("Đây là các scenes đã convert thành công nhưng bị loại bỏ bớt các frame do lệch timestamp cảm biến:\n")
     md.append("| Tên Scene | Số ảnh Raw | Số ảnh Converted | Số frame rớt | Thời lượng Raw | Converted | % Hụt |")
     md.append("| :--- | :---: | :---: | :---: | :---: | :---: | :---: |")
+
     for s in top_dropped_scenes[:20]:
         gap_sec = s["raw_duration_sec"] - s["converted_duration_sec"]
         pct = (gap_sec / s["raw_duration_sec"] * 100.0) if s["raw_duration_sec"] > 0 else 0.0
@@ -224,26 +260,50 @@ def generate_markdown_report(
 
     md.append("\n---\n")
 
-    md.append("### 5. Kết Luận & Đề Xuất Khắc Phục\n")
-    md.append("1. **Về tính toàn vẹn dữ liệu:** Toàn bộ 7.7 giờ dữ liệu đã nạp vào model hiện tại là dữ liệu **hoàn toàn sạch và chuẩn xác cao** (sai số đồng bộ < 80ms).")
-    md.append("2. **Giải pháp lấy lại 2.9 giờ bị hụt:**")
-    md.append("   - **Kiểm tra bên trích xuất raw:** Bổ sung lại các thư mục thiếu cảm biến `NAV`/`IMU` hoặc mapping lại tên camera nếu tên góc camera trước bị đổi khác chuẩn.")
-    md.append("   - **Nới lỏng ngưỡng đồng bộ:** Nếu chấp nhận sai số nhỏ hơn để cứu các frame rớt, có thể tăng cờ `--max-drift-ms` từ `80.0` lên `120.0` hoặc `150.0`.\n")
+    md.append("### 6. Kết Luận & Đánh Giá Chất Lượng\n")
+    if sync_mode == "interpolation":
+        md.append(
+            f"1. **Về tính toàn vẹn dữ liệu:** Toàn bộ **{conv_h:.2f} giờ** dữ liệu đã nạp vào model được "
+            f"đồng bộ chuẩn xác bằng **thuật toán nội suy tuyến tính (LERP) và SLERP Quaternion trên $S^3$**, "
+            f"đảm bảo các vector gia tốc, vận tốc và góc lái biến thiên liên tục, không bị nhiễu bậc thang.\n"
+            f"2. **Bản chất phần thời lượng hụt {gap_h:.2f} giờ:**\n"
+            f"   - **{skipped_h:.2f} giờ ({skipped_min:.1f} phút):** Bắt nguồn từ các scenes lỗi cấu trúc raw gốc (thiếu hẳn thư mục `OTHERS/`).\n"
+            f"   - **{intra_h:.2f} giờ còn lại:** Bắt nguồn từ giới hạn vật lý mép khởi động khi Camera bật trước CAN-bus trong lúc đợi GPS fix vệ tinh (nguyên tắc an toàn: Strictly No Extrapolation).\n"
+        )
+    else:
+        md.append(
+            f"1. **Về tính toàn vẹn dữ liệu:** Toàn bộ **{conv_h:.2f} giờ** dữ liệu đã nạp vào model hiện tại là dữ liệu "
+            f"đồng bộ dạng Nearest-Row (sai số < {max_drift_ms:.0f} ms).\n"
+            f"2. **Giải pháp lấy lại thời lượng bị hụt:**\n"
+            f"   - Chuyển đổi sang phương thức nội suy (Interpolation) để phục hồi phần lớn thời lượng bị hụt do lệch pha clock.\n"
+        )
 
     output_path.write_text("\n".join(md), encoding="utf-8")
 
 
 def main() -> None:
     args = parse_args()
-    raw_dirs = [Path(d.strip()) for d in args.raw_dirs.split(",") if d.strip()]
-    converted_dir = Path(args.converted_dir)
-    output_dir = Path(args.output_dir)
+    raw_dirs = [Path(d.strip().strip("\"'")) for d in args.raw_dirs.split(",") if d.strip().strip("\"'")]
+    converted_dir = Path(args.converted_dir.strip().strip("\"'"))
+    output_dir = Path(args.output_dir.strip().strip("\"'"))
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    dataset_info_path = converted_dir / "dataset_info.json"
+    sync_metadata: Dict[str, Any] = {}
+    if dataset_info_path.exists():
+        try:
+            sync_metadata = json.loads(dataset_info_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
 
     print("=" * 75)
     print("🔍 BẮT ĐẦU QUÉT KIỂM TOÁN DỮ LIỆU TOÀN DIỆN (RAW vs CONVERTED)")
     print(f"📁 Nguồn Raw      : {[str(d) for d in raw_dirs]}")
     print(f"📁 Nguồn Converted: {converted_dir}")
+    if sync_metadata:
+        mode = sync_metadata.get("sync_mode", "unknown")
+        gap = sync_metadata.get("max_interp_gap_ms") or sync_metadata.get("max_drift_ms")
+        print(f"⚙️  Chế độ Sync    : {mode} (threshold: {gap} ms)")
     print("=" * 75)
 
     # 1. Tìm tất cả scene candidates trong các nguồn raw
@@ -366,6 +426,11 @@ def main() -> None:
     gap_hours = max(0.0, raw_hours - conv_hours)
     gap_percent = (gap_hours / raw_hours * 100.0) if raw_hours > 0 else 0.0
 
+    skipped_dur_sec = sum(r["raw_duration_sec"] for r in unconverted_scenes)
+    skipped_dur_hours = skipped_dur_sec / 3600.0
+    intra_sync_gap_sec = sum(max(0.0, r["raw_duration_sec"] - r["converted_duration_sec"]) for r in all_records if r["status"] == "CONVERTED")
+    intra_sync_gap_hours = intra_sync_gap_sec / 3600.0
+
     summary = {
         "total_candidate_scenes": len(scenes),
         "converted_scenes": count_converted,
@@ -386,6 +451,14 @@ def main() -> None:
             "converted_hours": round(conv_hours, 2),
             "gap_hours": round(gap_hours, 2),
             "gap_percent": round(gap_percent, 1),
+        },
+        "gap_breakdown": {
+            "skipped_scenes_hours": round(skipped_dur_hours, 2),
+            "skipped_scenes_minutes": round(skipped_dur_hours * 60, 1),
+            "skipped_scenes_pct_of_gap": round(skipped_dur_hours / gap_hours * 100.0, 1) if gap_hours > 0 else 0.0,
+            "intra_scene_sync_gap_hours": round(intra_sync_gap_hours, 2),
+            "intra_scene_sync_gap_minutes": round(intra_sync_gap_hours * 60, 1),
+            "intra_scene_pct_of_gap": round(intra_sync_gap_hours / gap_hours * 100.0, 1) if gap_hours > 0 else 0.0,
         },
     }
 
@@ -418,7 +491,7 @@ def main() -> None:
     # Xuất file Markdown báo cáo đẹp
     md_file = Path(args.output_report).with_suffix(".md") if args.output_report else output_dir / "skipped_audit_report.md"
     md_file.parent.mkdir(parents=True, exist_ok=True)
-    generate_markdown_report(summary, unconverted_scenes, converted_records, md_file)
+    generate_markdown_report(summary, unconverted_scenes, converted_records, md_file, sync_metadata)
 
     print("\n" + "=" * 75)
     print("✨ ĐÃ XUẤT THÀNH CÔNG BỘ BÁO CÁO KIỂM TOÁN ✨")
