@@ -9,8 +9,7 @@ _RUN_DIR = os.environ.get("RUN_DIR", "work_dirs")
 
 @dataclass(frozen=True)
 class CaMoJEPAConfig:
-    # Dataset and dataloader parameters
-    dataset_root: str = "/dataset/camo_jepa"  # SLURM container mount path
+    dataset_root: str = os.environ.get("DATASET_ROOT", "/dataset/camo_jepa/datasets_converted_interp")
     dataset_split: str = "train"
     history_length: int = 16
     stride: int = 1

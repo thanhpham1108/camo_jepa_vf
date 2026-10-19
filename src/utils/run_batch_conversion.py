@@ -52,7 +52,7 @@ def main() -> None:
     env_sources = os.environ.get("DATASETS_RAW_DIRS") or os.environ.get("DATASETS_RAW_DIR")
     source_dirs = [s.strip() for s in env_sources.split(",")] if env_sources else DEFAULT_SOURCE_DIRS
 
-    output_root = Path(os.environ.get("DATASETS_CONVERTED_DIR", "/dataset/camo_jepa/datasets_converted"))
+    output_root = Path(os.environ.get("DATASETS_CONVERTED_DIR", "/dataset/camo_jepa/datasets_converted_interp"))
     sync_mode = os.environ.get("SYNC_MODE", "interpolation")
     max_interp_gap_ms = os.environ.get("MAX_INTERP_GAP_MS", "300.0")
 

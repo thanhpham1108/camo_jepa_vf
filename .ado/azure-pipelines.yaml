@@ -44,7 +44,7 @@ parameters:
     envs: |
       WORKSPACE_DIR=/workspaces/source
       RUN_DIR=/workspaces/result/run_dir
-      DATASET_ROOT=/dataset/camo_jepa/datasets_converted
+      DATASET_ROOT=/dataset/camo_jepa/datasets_converted_interp
       EPOCHS=7
 
 variables:

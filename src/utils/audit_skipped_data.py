@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--converted-dir",
-        default=os.environ.get("DATASETS_CONVERTED_DIR", "/dataset/camo_jepa/datasets_converted"),
+        default=os.environ.get("DATASETS_CONVERTED_DIR", "/dataset/camo_jepa/datasets_converted_interp"),
         help="Path to converted dataset root.",
     )
     parser.add_argument(

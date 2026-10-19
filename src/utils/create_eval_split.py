@@ -24,7 +24,9 @@ from pathlib import Path
 from typing import Dict, List
 
 
-DEFAULT_CONVERTED_DIR = "/dataset/camo_jepa/datasets_converted"
+DEFAULT_CONVERTED_DIR = os.environ.get(
+    "DATASETS_CONVERTED_DIR", "/dataset/camo_jepa/datasets_converted_interp"
+)
 DEFAULT_NEW_DATA_MARKER = "260926"  # scene nào đến từ data260926 thì npz có field source_raw chứa chuỗi này
 EVAL_RATIO = 0.20
 SEED = 42
