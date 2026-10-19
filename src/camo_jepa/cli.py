@@ -129,6 +129,8 @@ def main() -> None:
         image_size=config.image_size,
         max_cached_episodes=config.max_cached_episodes,
     )
+    if is_main:
+        print(f"[INFO] Dataset Split    : '{config.dataset_split}' ({len(dataset):,} training clips loaded from {config.dataset_root})")
     sampler = DistributedSampler(dataset, shuffle=True) if is_ddp else None
     dataloader = DataLoader(
         dataset,
