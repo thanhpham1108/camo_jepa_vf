@@ -264,6 +264,8 @@ def inspect_deep(raw_path: Path, converted_path: Path):
         test_args = argparse.Namespace(
             vf_root=sample_scene,
             camera=active_cam,
+            sync_mode="interpolation",
+            max_interp_gap_ms=300.0,
             max_drift_ms=80.0,
             split="train",
             log_name="test_sample",
@@ -272,9 +274,10 @@ def inspect_deep(raw_path: Path, converted_path: Path):
             target_hz=10.0,
             max_frames=50,
             dry_run=True,
+            skip_log=False,
         )
         print(f"🧪 Đang thử build samples trên scene mẫu (Camera: {active_cam})...")
-        samples, skipped = build_samples(test_args)
+        samples, skipped, *_ = build_samples(test_args)
         print(f"  🎉 TEST THÀNH CÔNG! Đồng bộ được {len(samples)} frames (Bỏ qua do lệch sync: {skipped})")
         if samples:
             print(f"  * CAN bus shape  : {samples[0].can_bus.shape} (Kỳ vọng: 18)")

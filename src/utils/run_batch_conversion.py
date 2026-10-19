@@ -53,12 +53,15 @@ def main() -> None:
     source_dirs = [s.strip() for s in env_sources.split(",")] if env_sources else DEFAULT_SOURCE_DIRS
 
     output_root = Path(os.environ.get("DATASETS_CONVERTED_DIR", "/dataset/camo_jepa/datasets_converted"))
+    sync_mode = os.environ.get("SYNC_MODE", "interpolation")
+    max_interp_gap_ms = os.environ.get("MAX_INTERP_GAP_MS", "300.0")
 
     print("=" * 70)
     print("🚀 BẮT ĐẦU QUÁ TRÌNH BATCH CONVERSION DỮ LIỆU")
     print("=" * 70)
     print(f"📌 Nguồn raw data : {source_dirs}")
     print(f"📌 Thư mục output : {output_root}")
+    print(f"📌 Chế độ sync    : {sync_mode} (max_interp_gap={max_interp_gap_ms} ms)")
     print("=" * 70)
 
     output_root.mkdir(parents=True, exist_ok=True)
@@ -109,6 +112,8 @@ def main() -> None:
             "--output-root", str(output_root),
             "--split", "train",
             "--image-mode", "symlink",
+            "--sync-mode", sync_mode,
+            "--max-interp-gap-ms", max_interp_gap_ms,
         ]
 
         try:
