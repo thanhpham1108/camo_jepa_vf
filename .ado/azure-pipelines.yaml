@@ -124,7 +124,7 @@ stages:
         ENTRY_COMMAND: '${{ parameters.entryCommand }}'
         EXCLUDE_PATTERNS: '${{ parameters.excludePatterns }}'
         USER_EXTRA_ENV: '${{ parameters.extraEnv.envs }}'
-        AIRFLOW_DAG_ID: camo_jepa_pipeline_dag
+        AIRFLOW_DAG_ID: slurm_camo_jepa_pipeline_dag
         AIRFLOW_TIMEOUT_MINUTES: '4620'
         AIRFLOW_CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
         AIRFLOW_ATTACH: '${{ parameters.attachToCurrentRun }}'
