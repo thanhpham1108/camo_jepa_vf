@@ -27,9 +27,31 @@ from typing import Dict, List
 DEFAULT_CONVERTED_DIR = os.environ.get(
     "DATASETS_CONVERTED_DIR", "/dataset/camo_jepa/datasets_converted_interp"
 )
-DEFAULT_NEW_DATA_MARKER = "260926"  # scene nào đến từ data260926 thì npz có field source_raw chứa chuỗi này
+DEFAULT_NEW_DATA_MARKER = "260926"
 EVAL_RATIO = 0.20
 SEED = 42
+
+# Danh sách đầy đủ 18 scenes gốc của datasets_raw (chỉ 14 scenes convert được, 100% vào train)
+KNOWN_DATASETS_RAW_SCENES = {
+    "20251229_141800_Parking_028_1766992680_1766994000",
+    "20260304_1057_VF6_01_1772596632_1772600232",
+    "20260304_1057_VF6_01_1772596632_1772600232_1772598255_1772598288_utm_trimmed_latlon",
+    "20260304_1057_VF6_01_1772596632_1772600232_1772599213_1772599272_utm_trimmed_latlon",
+    "20260304_1057_VF6_01_1772596632_1772600232_1772599800_1772599837_utm_trimmed_latlon",
+    "20260304_1157_VF6_01_1772600232_1772603832_1772602831_1772603040_utm_trimmed_latlon",
+    "20260304_1357_VF6_01_1772607432_1772611032_1772607794_1772607862_utm_trimmed_latlon",
+    "20260304_1357_VF6_01_1772607432_1772611032_1772608023_1772608279_utm_trimmed_latlon",
+    "20260317_1429_VF6_01_1773732592_1773736192_1773732606_1773732806_colored_scans_latlon",
+    "20260317_1429_VF6_01_1773732592_1773736192_1773732786_1773732868_colored_scans_latlon",
+    "20260317_1429_VF6_01_1773732592_1773736192_1773732868_1773732997_colored_scans_latlon",
+    "20260317_1429_VF6_01_1773732592_1773736192_1773733277_1773733298_colored_scans_latlon",
+    "20260319_1502_VF6_01_1773907354_1773910954",
+    "20260319_1502_VF6_01_1773907354_1773910954_1773909002_1773909086_utm_trimmed_latlon",
+    "20260319_1502_VF6_01_1773907354_1773910954_1773909244_1773909319_utm_trimmed_latlon",
+    "20260319_1602_VF6_01_1773910954_1773914554_1773911641_1773911791_colored_scans_latlon",
+    "20260319_1602_VF6_01_1773910954_1773914554_1773911791_1773912171_colored_scans_latlon",
+    "20260319_1602_VF6_01_1773910954_1773914554_1773912171_1773912471_colored_scans_latlon",
+}
 
 
 def resolve_path(path_str: str) -> Path:
@@ -114,18 +136,14 @@ def get_episodes_by_group(
                 except Exception:
                     pass
 
-        # Phân loại
-        if "data260926" in src or "VF6_01_02" in src or "VF6_03" in src:
-            if "VF6_03" in src:
-                groups["data260926/VF6_03"].append(npz)
-            else:
-                groups["data260926/VF6_01_02"].append(npz)
-        elif "VF6_01_02" in ep_name:
-            groups["data260926/VF6_01_02"].append(npz)
-        elif "VF6_03" in ep_name:
+        # Phân loại tuyệt đối:
+        if ep_name in KNOWN_DATASETS_RAW_SCENES or "datasets_raw" in src:
+            groups["datasets_raw"].append(npz)
+        elif "VF6_03" in ep_name or "VF6_03" in src:
             groups["data260926/VF6_03"].append(npz)
         else:
-            groups["datasets_raw"].append(npz)
+            # Toàn bộ 819 scenes còn lại của data260926 thuộc nhóm xe VF6_01_02
+            groups["data260926/VF6_01_02"].append(npz)
 
     return groups
 
