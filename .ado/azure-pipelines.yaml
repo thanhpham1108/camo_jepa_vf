@@ -22,14 +22,6 @@ parameters:
   displayName: 'Run without GPU (Set true to run slurm job without GPU resource for easier allocation)'
   type: boolean
   default: false
-- name: enableS3Upload
-  displayName: 'Enable S3 Upload (Package and upload run results to S3 when job finishes)'
-  type: boolean
-  default: true
-- name: streamLogs
-  displayName: 'Stream Task Logs (Enable to stream raw container logs to ADO console; default false shows clean status heartbeats)'
-  type: boolean
-  default: false
 - name: entryCommand
   displayName: 'Entry Command executed on Slurm container (e.g. direct python command or shell script)'
   type: string
@@ -81,13 +73,11 @@ stages:
         AIRFLOW_CONF_JSON=$(jq -cn \
           --arg run_id           "$PIPELINE_RUN_ID" \
           --arg entry_command    "$ENTRY_COMMAND" \
-          --arg enable_s3_upload "$ENABLE_S3_UPLOAD" \
           --arg exclude_patterns "$EXCLUDE_PATTERNS" \
           --arg user_extra       "$USER_EXTRA_ENV" \
           '{
             pipeline_run_id: $run_id,
             entry_command: $entry_command,
-            enable_s3_upload: ($enable_s3_upload | test("(?i)^true$|1|yes")),
             exclude_patterns: (
               $exclude_patterns
               | if length > 0 and (startswith("[") or startswith("{")) then (try fromjson catch [])
@@ -115,16 +105,11 @@ stages:
         if [ "$ATTACH_TO_CURRENT_RUN" = "True" ] || [ "$ATTACH_TO_CURRENT_RUN" = "true" ] || [ "$ATTACH_TO_CURRENT_RUN" = "1" ]; then
           TRIGGER_ARGS+=("--attach")
         fi
-        if [ "$STREAM_LOGS" = "True" ] || [ "$STREAM_LOGS" = "true" ] || [ "$STREAM_LOGS" = "1" ]; then
-          TRIGGER_ARGS+=("--stream-logs")
-        fi
+        TRIGGER_ARGS+=("--stream-logs")
 
         python3 -u $(AIRFLOW_TRIGGER_SCRIPT) "${TRIGGER_ARGS[@]}"
       displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow'
       env:
-        ENABLE_S3_UPLOAD: '${{ parameters.enableS3Upload }}'
-        STREAM_LOGS: '${{ parameters.streamLogs }}'
-        AIRFLOW_STREAM_LOGS: '${{ parameters.streamLogs }}'
         NO_GPU: '${{ parameters.noGpu }}'
         CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
         ATTACH_TO_CURRENT_RUN: '${{ parameters.attachToCurrentRun }}'
@@ -150,7 +135,7 @@ stages:
 - stage: PublishArtifacts
   displayName: 'Download & Publish Artifacts'
   dependsOn: RunPipeline
-  condition: and(succeeded(), eq('${{ parameters.enableS3Upload }}', 'true'))
+  condition: succeeded()
   jobs:
   - job: PublishArtifactsJob
     displayName: 'Download from S3 & Publish Artifact'
