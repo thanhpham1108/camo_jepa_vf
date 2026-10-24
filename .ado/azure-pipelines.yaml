@@ -26,6 +26,10 @@ parameters:
   displayName: 'Enable S3 Upload (Package and upload run results to S3 when job finishes)'
   type: boolean
   default: true
+- name: streamLogs
+  displayName: 'Stream Task Logs (Enable to stream raw container logs to ADO console; default false shows clean status heartbeats)'
+  type: boolean
+  default: false
 - name: entryCommand
   displayName: 'Entry Command executed on Slurm container (e.g. direct python command or shell script)'
   type: string
@@ -111,11 +115,16 @@ stages:
         if [ "$ATTACH_TO_CURRENT_RUN" = "True" ] || [ "$ATTACH_TO_CURRENT_RUN" = "true" ] || [ "$ATTACH_TO_CURRENT_RUN" = "1" ]; then
           TRIGGER_ARGS+=("--attach")
         fi
+        if [ "$STREAM_LOGS" = "True" ] || [ "$STREAM_LOGS" = "true" ] || [ "$STREAM_LOGS" = "1" ]; then
+          TRIGGER_ARGS+=("--stream-logs")
+        fi
 
         python3 -u $(AIRFLOW_TRIGGER_SCRIPT) "${TRIGGER_ARGS[@]}"
       displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow'
       env:
         ENABLE_S3_UPLOAD: '${{ parameters.enableS3Upload }}'
+        STREAM_LOGS: '${{ parameters.streamLogs }}'
+        AIRFLOW_STREAM_LOGS: '${{ parameters.streamLogs }}'
         NO_GPU: '${{ parameters.noGpu }}'
         CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
         ATTACH_TO_CURRENT_RUN: '${{ parameters.attachToCurrentRun }}'
