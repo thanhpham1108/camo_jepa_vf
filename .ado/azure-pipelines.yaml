@@ -10,10 +10,6 @@ parameters:
   displayName: 'Pipeline Run ID (Set "auto" for new build ID, or pass existing run ID)'
   type: string
   default: 'auto'
-- name: skipGitSync
-  displayName: 'Skip Git Sync (Set true to skip syncing source repository if already cloned on SLURM)'
-  type: boolean
-  default: false
 - name: cancelPreviousRun
   displayName: 'Cancel Previous Active Run (Set true to cancel any currently running pipeline before starting)'
   type: boolean
@@ -53,7 +49,10 @@ variables:
     PIPELINE_RUN_ID: run_$(Build.BuildId)
   ${{ if and(ne(parameters.pipelineRunId, 'auto'), ne(parameters.pipelineRunId, '')) }}:
     PIPELINE_RUN_ID: ${{ parameters.pipelineRunId }}
-  REPO_NAME: "camo_jepa"
+  ${{ if eq(parameters.noGpu, true) }}:
+    AIRFLOW_DAG_ID: slurm_camo_jepa_cpu_pipeline_dag
+  ${{ else }}:
+    AIRFLOW_DAG_ID: slurm_camo_jepa_pipeline_dag
   S3_BUCKET: "training-artifacts"
 
 stages:
@@ -61,7 +60,7 @@ stages:
   displayName: 'Run Pipeline on Slurm (via Airflow)'
   jobs:
   - job: RunPipelineJob
-    displayName: 'Execute camo_jepa_pipeline_dag'
+    displayName: 'Execute Airflow Slurm DAG'
     timeoutInMinutes: 0
     cancelTimeoutInMinutes: 5
     workspace:
@@ -73,18 +72,11 @@ stages:
         # Build the Airflow conf JSON safely with jq (supports both JSON object and KEY=VALUE multiline)
         AIRFLOW_CONF_JSON=$(jq -cn \
           --arg run_id           "$PIPELINE_RUN_ID" \
-          --arg git_branch       "$(Build.SourceBranchName)" \
-          --arg skip_git_sync    "$SKIP_GIT_SYNC" \
           --arg entry_command    "$ENTRY_COMMAND" \
           --arg exclude_patterns "$EXCLUDE_PATTERNS" \
           --arg user_extra       "$USER_EXTRA_ENV" \
           '{
             pipeline_run_id: $run_id,
-            branch: $git_branch,
-            git_branch: $git_branch,
-            repo_branch: $git_branch,
-            repo_name: "camo_jepa",
-            skip_git_sync: ($skip_git_sync | test("(?i)^true$|1|yes")),
             entry_command: $entry_command,
             exclude_patterns: (
               $exclude_patterns
@@ -113,18 +105,18 @@ stages:
         if [ "$ATTACH_TO_CURRENT_RUN" = "True" ] || [ "$ATTACH_TO_CURRENT_RUN" = "true" ] || [ "$ATTACH_TO_CURRENT_RUN" = "1" ]; then
           TRIGGER_ARGS+=("--attach")
         fi
+        TRIGGER_ARGS+=("--stream-logs")
 
         python3 -u $(AIRFLOW_TRIGGER_SCRIPT) "${TRIGGER_ARGS[@]}"
-      displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow (camo_jepa_pipeline_dag)'
+      displayName: 'Execute CaMo-JEPA Pipeline on Slurm via Airflow'
       env:
-        SKIP_GIT_SYNC: '${{ parameters.skipGitSync }}'
         NO_GPU: '${{ parameters.noGpu }}'
         CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
         ATTACH_TO_CURRENT_RUN: '${{ parameters.attachToCurrentRun }}'
         ENTRY_COMMAND: '${{ parameters.entryCommand }}'
         EXCLUDE_PATTERNS: '${{ parameters.excludePatterns }}'
         USER_EXTRA_ENV: '${{ parameters.extraEnv.envs }}'
-        AIRFLOW_DAG_ID: camo_jepa_pipeline_dag
+        AIRFLOW_DAG_ID: $(AIRFLOW_DAG_ID)
         AIRFLOW_TIMEOUT_MINUTES: '4620'
         AIRFLOW_CANCEL_PREVIOUS: '${{ parameters.cancelPreviousRun }}'
         AIRFLOW_ATTACH: '${{ parameters.attachToCurrentRun }}'
@@ -132,7 +124,7 @@ stages:
 
     - script: |
         python3 -u $(AIRFLOW_TRIGGER_SCRIPT) --cancel \
-          --dag-id "camo_jepa_pipeline_dag" \
+          --dag-id "$(AIRFLOW_DAG_ID)" \
           --run-id "$(AIRFLOW_RUN_ID)" \
           --pipeline-run-id "$(PIPELINE_RUN_ID)"
       displayName: 'Cancel Airflow DAG Run and SLURM Job on Pipeline Cancellation'
@@ -156,7 +148,7 @@ stages:
     - script: |
         set -e
         bucket_name=$(S3_BUCKET)
-        s3_key="workspaces/$(REPO_NAME)/$(PIPELINE_RUN_ID)/results.tar.gz"
+        s3_key="workspaces/slurm_camo_jepa_pipeline_dag/$(PIPELINE_RUN_ID)/results.tar.gz"
         archive_path="$(Agent.TempDirectory)/results.tar.gz"
         output_dir="$(Build.ArtifactStagingDirectory)/eval_results"
 
@@ -177,7 +169,6 @@ stages:
         AWS_ACCESS_KEY_ID: $(S3_ACCESS_KEY)
         AWS_SECRET_ACCESS_KEY: $(S3_SECRET_KEY)
         S3_BUCKET: "training-artifacts"
-        REPO_NAME: $(REPO_NAME)
         PIPELINE_RUN_ID: $(PIPELINE_RUN_ID)
 
     - task: PublishBuildArtifacts@1
